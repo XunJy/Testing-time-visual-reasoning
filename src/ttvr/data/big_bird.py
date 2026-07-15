@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode, urlsplit
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .bird_crops import (
     DEFAULT_CONTEXT_SCALE,
@@ -109,6 +109,8 @@ BIG_BIRD_EXPECTED_COUNTS = {
 _SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 _OFFICIAL_METADATA_HOST = "lilawildlife.blob.core.windows.net"
 _GCS_HOST = "storage.googleapis.com"
+_EXIF_ORIENTATION_TAG = 274
+_EXIF_ORIENTATIONS_SWAPPING_AXES = frozenset({5, 6, 7, 8})
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +254,7 @@ class BigBirdPreparation:
     source_category_count: int
     canonical_taxon_count: int
     clipped_bbox_count: int
+    exif_transposed_source_images: int
     generic_bird_crops_omitted: int
     manifest_fingerprint: str
 
@@ -911,6 +914,49 @@ def _reuse_or_write_crop(image: Image.Image, destination: Path) -> tuple[str, st
         return _reuse_or_write_crop(image, destination)
 
 
+def _load_source_image_in_metadata_orientation(
+    source_path: Path,
+    image_plan: BigBirdImagePlan,
+) -> tuple[Image.Image, tuple[int, int], int | None, bool]:
+    """Decode one image in the coordinate space used by official bboxes."""
+
+    expected_size = (image_plan.width, image_plan.height)
+    with Image.open(source_path) as raw:
+        raw.load()
+        decoded_size = raw.size
+        orientation = raw.getexif().get(_EXIF_ORIENTATION_TAG)
+        if orientation is not None and (
+            isinstance(orientation, bool)
+            or not isinstance(orientation, int)
+            or orientation not in range(1, 9)
+        ):
+            raise RuntimeError(
+                f"Invalid Big Bird EXIF orientation for {image_plan.image_id}: {orientation!r}"
+            )
+        exif_transpose_applied = False
+        if decoded_size == expected_size:
+            oriented = raw
+        elif (
+            decoded_size == (image_plan.height, image_plan.width)
+            and orientation in _EXIF_ORIENTATIONS_SWAPPING_AXES
+        ):
+            oriented = ImageOps.exif_transpose(raw)
+            exif_transpose_applied = True
+            if oriented.size != expected_size:  # pragma: no cover - Pillow invariant.
+                raise RuntimeError(
+                    f"Big Bird EXIF transpose did not match metadata for "
+                    f"{image_plan.image_id}: metadata={expected_size}, image={oriented.size}"
+                )
+        else:
+            raise RuntimeError(
+                f"Big Bird source dimensions changed for {image_plan.image_id}: "
+                f"metadata={expected_size}, decoded={decoded_size}, "
+                f"exif_orientation={orientation!r}"
+            )
+        source_image = oriented.convert("RGB")
+    return source_image, decoded_size, orientation, exif_transpose_applied
+
+
 def _process_source_image(
     root: Path,
     image_plan: BigBirdImagePlan,
@@ -934,14 +980,12 @@ def _process_source_image(
     reused_crops = 0
     completed = False
     try:
-        with Image.open(source_path) as raw:
-            raw.load()
-            if raw.size != (image_plan.width, image_plan.height):
-                raise RuntimeError(
-                    f"Big Bird source dimensions changed for {image_plan.image_id}: "
-                    f"metadata={(image_plan.width, image_plan.height)}, image={raw.size}"
-                )
-            source_image = raw.convert("RGB")
+        (
+            source_image,
+            decoded_size,
+            exif_orientation,
+            exif_transpose_applied,
+        ) = _load_source_image_in_metadata_orientation(source_path, image_plan)
         for crop_plan in sorted(crop_plans, key=lambda crop: crop.annotation_id):
             crop, geometry = square_context_crop(
                 source_image,
@@ -976,6 +1020,7 @@ def _process_source_image(
             provenance.append(
                 {
                     "annotation_id": crop_plan.annotation_id,
+                    "bbox_coordinate_space": "official metadata display orientation",
                     "bbox_was_clipped": crop_plan.bbox_was_clipped,
                     "bbox_xywh_official": list(crop_plan.bbox_xywh),
                     "bbox_xyxy_effective": list(crop_plan.bbox_xyxy_effective),
@@ -994,6 +1039,10 @@ def _process_source_image(
                     "raw_label": crop_plan.raw_label,
                     "source_image_id": image_plan.image_id,
                     "source_image_sha256": source_sha256,
+                    "source_decoded_size": list(decoded_size),
+                    "source_effective_size": list(source_image.size),
+                    "source_exif_orientation": exif_orientation,
+                    "source_exif_transpose_applied": exif_transpose_applied,
                     "source_scientific_name": crop_plan.source_scientific_name,
                     "taxon_id": crop_plan.taxon_id,
                 }
@@ -1004,6 +1053,12 @@ def _process_source_image(
             source_path.unlink(missing_ok=True)
     source_image_row = {
         "content_type": record.content_type,
+        "decoded_height": decoded_size[1],
+        "decoded_width": decoded_size[0],
+        "effective_height": source_image.height,
+        "effective_width": source_image.width,
+        "exif_orientation": exif_orientation,
+        "exif_transpose_applied": exif_transpose_applied,
         "file_name": image_plan.file_name,
         "gcs_generation": record.generation,
         "gcs_md5_base64": record.md5_base64,
@@ -1176,6 +1231,9 @@ def prepare_big_bird(
         source_category_count=plan.specific_source_category_count,
         canonical_taxon_count=len(plan.taxa),
         clipped_bbox_count=sum(crop.bbox_was_clipped for crop in plan.crops),
+        exif_transposed_source_images=sum(
+            bool(row["exif_transpose_applied"]) for row in source_images
+        ),
         generic_bird_crops_omitted=plan.generic_bird_crop_count,
         manifest_fingerprint=validation.fingerprint,
     )
@@ -1203,6 +1261,11 @@ def prepare_big_bird(
             "prefix": BIG_BIRD_GCS_PREFIX,
         },
         "generic_category_policy": "omit category name exactly equal to 'bird'",
+        "image_orientation_policy": (
+            "Official bboxes remain in metadata coordinates. Apply EXIF transpose only when "
+            "decoded width/height exactly swap metadata height/width and EXIF orientation is "
+            "5, 6, 7, or 8; every other dimension mismatch fails closed."
+        ),
         "license": BIG_BIRD_LICENSE,
         "metadata_observed_sha256": plan.metadata_sha256,
         "metadata_publisher_checksum": None,

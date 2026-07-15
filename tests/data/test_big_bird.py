@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageOps
 
 from ttvr.data.big_bird import (
     BIG_BIRD_DATASET_ID,
@@ -192,6 +192,105 @@ def test_prepare_downloads_only_selected_image_and_writes_audited_bundle(
     with pytest.raises(FileExistsError, match="Refusing to replace"):
         prepare_big_bird(
             root,
+            birdnet_csv_path=birdnet_csv,
+            metadata_path=metadata_path,
+            workers=1,
+            require_official_lock=False,
+        )
+
+
+def test_prepare_applies_explicit_exif_rotation_to_metadata_bbox_space(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _metadata()
+    payload["images"][0].update(width=40, height=60)  # type: ignore[index]
+    payload["annotations"][0]["bbox"] = [20.0, 40.0, 20.0, 20.0]  # type: ignore[index]
+    metadata_path = tmp_path / "metadata.json"
+    metadata_path.write_text(json.dumps(payload), encoding="utf-8")
+    birdnet_csv = tmp_path / "birdnet.csv"
+    _write_birdnet_csv(birdnet_csv)
+
+    source = tmp_path / "publisher-oriented.jpg"
+    raw = Image.new("RGB", (60, 40), color=(180, 20, 20))
+    for x in range(40, 60):
+        for y in range(20):
+            raw.putpixel((x, y), (20, 180, 20))
+    exif = Image.Exif()
+    exif[274] = 6
+    raw.save(source, format="JPEG", quality=100, subsampling=0, exif=exif)
+
+    monkeypatch.setattr(
+        "ttvr.data.big_bird._list_gcs_objects",
+        lambda _required: {"big-bird/specific.jpg": _gcs_record(source)},
+    )
+    monkeypatch.setattr(
+        "ttvr.data.big_bird._stream_download_to_path",
+        lambda _url, destination, **_kwargs: shutil.copyfile(source, destination),
+    )
+    root = tmp_path / "prepared"
+    report = prepare_big_bird(
+        root,
+        birdnet_csv_path=birdnet_csv,
+        metadata_path=metadata_path,
+        workers=1,
+        context_scale=1.0,
+        require_official_lock=False,
+    )
+
+    assert report.exif_transposed_source_images == 1
+    samples = load_samples(root / "manifests/samples.jsonl")
+    with Image.open(source) as encoded:
+        expected = ImageOps.exif_transpose(encoded).convert("RGB").crop((20, 40, 40, 60))
+    with Image.open(root / samples[0].relative_path) as actual:
+        assert actual.size == expected.size == (20, 20)
+        assert actual.convert("RGB").tobytes() == expected.tobytes()
+
+    provenance = json.loads((root / "manifests/crop_provenance.jsonl").read_text().splitlines()[0])
+    assert provenance["bbox_coordinate_space"] == "official metadata display orientation"
+    assert provenance["source_decoded_size"] == [60, 40]
+    assert provenance["source_effective_size"] == [40, 60]
+    assert provenance["source_exif_orientation"] == 6
+    assert provenance["source_exif_transpose_applied"] is True
+    source_image = json.loads((root / "manifests/source_images.jsonl").read_text().splitlines()[0])
+    assert source_image["exif_orientation"] == 6
+    assert source_image["exif_transpose_applied"] is True
+    source_manifest = json.loads((root / "manifests/source.json").read_text())
+    assert source_manifest["report"]["exif_transposed_source_images"] == 1
+    assert (
+        "every other dimension mismatch fails closed" in source_manifest["image_orientation_policy"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("decoded_size", "orientation"),
+    [((10, 12), None), ((10, 12), 3), ((11, 10), 6)],
+)
+def test_other_dimensions_without_matching_axis_swapping_exif_still_fail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    decoded_size: tuple[int, int],
+    orientation: int | None,
+) -> None:
+    metadata_path, birdnet_csv, _source = _write_fixture(tmp_path)
+    source = tmp_path / f"mismatch-{decoded_size}-{orientation}.jpg"
+    image = Image.new("RGB", decoded_size, color=(20, 40, 60))
+    exif = Image.Exif()
+    if orientation is not None:
+        exif[274] = orientation
+    image.save(source, format="JPEG", exif=exif)
+    monkeypatch.setattr(
+        "ttvr.data.big_bird._list_gcs_objects",
+        lambda _required: {"big-bird/specific.jpg": _gcs_record(source)},
+    )
+    monkeypatch.setattr(
+        "ttvr.data.big_bird._stream_download_to_path",
+        lambda _url, destination, **_kwargs: shutil.copyfile(source, destination),
+    )
+
+    with pytest.raises(RuntimeError, match="source dimensions changed"):
+        prepare_big_bird(
+            tmp_path / "prepared",
             birdnet_csv_path=birdnet_csv,
             metadata_path=metadata_path,
             workers=1,
