@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import re
 from pathlib import Path
 
 from ttvr.data.bird_manifest import ManifestBirdDataset, load_samples, load_taxa
+from ttvr.gpu_lock import DEFAULT_GPU_LOCK_PATH, GPULockBusyError, exclusive_gpu_lock
 from ttvr.models.clip import CLIPBackend
 
 
@@ -27,7 +29,7 @@ class ProgressPrinter:
             self.previous = completed
 
 
-def main() -> None:
+def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--samples", type=Path, required=True)
@@ -48,7 +50,25 @@ def main() -> None:
     )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--skip-image-verification", action="store_true")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--gpu-lock",
+        type=Path,
+        default=DEFAULT_GPU_LOCK_PATH,
+        help=(
+            "Fail-fast advisory lock shared with the formal BirdMix matrix "
+            f"(default: {DEFAULT_GPU_LOCK_PATH})"
+        ),
+    )
+    parser.add_argument(
+        "--no-gpu-lock",
+        action="store_true",
+        help="Unsafe advanced/testing opt-out; never use for formal cache generation",
+    )
+    return parser.parse_args()
+
+
+def cache_manifest_features(args: argparse.Namespace) -> list[dict[str, str | int]]:
+    """Encode all requested splits after the caller has enforced GPU exclusion."""
 
     samples = load_samples(args.samples)
     taxa = load_taxa(args.taxa)
@@ -78,9 +98,7 @@ def main() -> None:
             f"{identity}-fp32-{dataset.fingerprint[:16]}.pt"
         )
         cache_path = args.cache_dir / "image_features" / name
-        cache_tag = (
-            f"{dataset.dataset_id}:{split}:{dataset.fingerprint}:{backend.cache_identity}"
-        )
+        cache_tag = f"{dataset.dataset_id}:{split}:{dataset.fingerprint}:{backend.cache_identity}"
         features = backend.encode_dataset(
             dataset,
             batch_size=args.batch_size,
@@ -101,6 +119,24 @@ def main() -> None:
                 "cache_path": str(cache_path),
             }
         )
+    return outputs
+
+
+def main() -> None:
+    args = _parse_args()
+    lock: contextlib.AbstractContextManager[None]
+    if args.no_gpu_lock:
+        lock = contextlib.nullcontext()
+    else:
+        lock = exclusive_gpu_lock(
+            args.gpu_lock,
+            purpose="CLIP manifest feature caching",
+        )
+    try:
+        with lock:
+            outputs = cache_manifest_features(args)
+    except GPULockBusyError as error:
+        raise SystemExit(str(error)) from error
     print(json.dumps(outputs, indent=2, sort_keys=True))
 
 

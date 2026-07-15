@@ -11,6 +11,7 @@ from scripts.feature_adapter import run_clip_multi_bird as runner
 from ttvr.data.bird_manifest import BirdSample, BirdTaxon
 from ttvr.methods.feature_adapter import FeatureTask, PreparedFeatureTask
 from ttvr.methods.feature_adapter.tasks import stable_taxon_partition
+from ttvr.models.clip import OpenAIClipCheckpoint, OpenAIClipInstallation
 
 
 class _SyntheticCub:
@@ -48,6 +49,58 @@ def _cub_payload(dataset: _SyntheticCub) -> dict[str, object]:
         "labels": torch.tensor(dataset.targets, dtype=torch.long),
         "sample_indices": torch.arange(count, dtype=torch.long),
     }
+
+
+def test_source_digest_covers_usgs_and_nm_preparation_dependencies() -> None:
+    project_root = Path(__file__).resolve().parents[3]
+    paths = runner._source_digest_paths(
+        project_root,
+        (
+            "usgs-aerial-avian-2023-publisher-crops",
+            "nm-uas-waterfowl-expert-consensus-v1",
+        ),
+    )
+    relative = {path.relative_to(project_root).as_posix() for path in paths}
+
+    assert {
+        "scripts/feature_adapter/cache_clip_manifest_features.py",
+        "scripts/feature_adapter/verify_clip_runtime.py",
+        "src/ttvr/metrics.py",
+        "src/ttvr/data/bird_crops.py",
+        "src/ttvr/data/bird_source_archive.py",
+        "src/ttvr/data/birdnet_lock.py",
+        "src/ttvr/data/usgs_aerial_avian.py",
+        "src/ttvr/data/nm_uas_waterfowl.py",
+    } <= relative
+
+
+def test_model_runtime_config_records_consuming_interpreter_identity(
+    tmp_path: Path,
+) -> None:
+    installation = OpenAIClipInstallation(
+        distribution="clip",
+        version="1.0",
+        repository_url="https://github.com/openai/CLIP.git",
+        vcs="git",
+        commit_id="a" * 40,
+    )
+    checkpoint = OpenAIClipCheckpoint(
+        model_name="ViT-L/14@336px",
+        path=tmp_path / "ViT-L-14-336px.pt",
+        sha256="b" * 64,
+        size_bytes=123,
+    )
+    backend = SimpleNamespace(
+        cache_identity=f"openai-clip:ViT-L/14@336px@{'a' * 40}",
+        openai_clip_installation=installation,
+        openai_clip_checkpoint=checkpoint,
+    )
+
+    value = runner._model_runtime_config(backend)  # type: ignore[arg-type]
+
+    assert value["clip_commit"] == "a" * 40
+    assert value["checkpoint_sha256"] == "b" * 64
+    assert value["cache_identity"].endswith("@" + "a" * 40)
 
 
 def test_cub_target_cache_validator_locks_metadata_alignment_and_norms(
@@ -111,9 +164,7 @@ def test_source_task_membership_records_taxa_and_stable_index_digest() -> None:
 
     assert row["taxon_ids"] == ("taxon:a", "taxon:b")
     assert row["source_indices_count"] == 3
-    assert row["source_indices_sha256"] == runner._source_indices_sha256(
-        prepared.source_indices
-    )
+    assert row["source_indices_sha256"] == runner._source_indices_sha256(prepared.source_indices)
     assert row["source_index_space_size"] == 6
 
 
@@ -422,8 +473,7 @@ def test_small_source_validation_is_audited_and_skipped_without_breaking_global_
     ) -> tuple[dict[str, torch.Tensor], list[dict[str, str]]]:
         del backend
         prototypes = {
-            taxon_id: torch.eye(4)[index % 4]
-            for index, taxon_id in enumerate(sorted(taxa_by_id))
+            taxon_id: torch.eye(4)[index % 4] for index, taxon_id in enumerate(sorted(taxa_by_id))
         }
         return prototypes, []
 
@@ -447,9 +497,7 @@ def test_small_source_validation_is_audited_and_skipped_without_breaking_global_
         for row in membership_rows
     )
     small_audit = next(row for row in partition_rows if row["dataset_id"] == "small")
-    assert small_audit["unseen_validation"]["status"] == (
-        "omitted-fewer-than-two-eligible-taxa"
-    )
+    assert small_audit["unseen_validation"]["status"] == ("omitted-fewer-than-two-eligible-taxa")
     assert small_audit["unseen_validation"]["eligible_taxon_count"] == 1
     assert small_audit["official_test_manifest_samples"] == 1
     assert small_audit["official_test_samples_used"] == 0

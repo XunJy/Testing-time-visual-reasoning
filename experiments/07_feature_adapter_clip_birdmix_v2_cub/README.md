@@ -100,6 +100,46 @@ run the three trials sequentially. Every result is written under this
 experiment's own `runs/` directory with a timestamp and config digest; no
 earlier result is replaced.
 
+The formal launcher acquires `/tmp/ttvr-gpu.lock` before preflight and keeps
+the lock across all three seeds. The normal
+`cache_clip_manifest_features.py` invocation acquires that same lock before it
+loads CLIP or reads a manifest. Both commands fail immediately with a clear
+busy-lock error; they never wait silently or run concurrently. `--no-gpu-lock`
+is an explicit unsafe opt-out reserved for isolated tests or expert-managed
+GPU scheduling, not formal cache generation. Invoke the cache script directly;
+do not wrap it in a second external `flock` on `/tmp/ttvr-gpu.lock`, because
+the built-in lock is now the sole lock owner for that process.
+
+The launcher runs its CLIP preflight with the exact interpreter selected by
+`--python`. That interpreter must report the pinned OpenAI CLIP PEP 610 Git
+commit and the exact SHA-256 of `ViT-L-14-336px.pt`; any already-existing text
+cache must also be compatible. Each model-consuming child verifies the same
+installation and checkpoint again; `config.json` records the verified commit,
+cache identity, checkpoint path, size, and SHA-256. The cache identity remains
+byte-for-byte compatible with existing caches produced by the correct pinned
+runtime.
+
+The run's source-code digest also covers the metric implementation and the
+manifest feature-cache entry point in addition to the adapter, model, dataset,
+and runner implementations.
+
+After all three runs complete, create the fail-closed formal summary with:
+
+```bash
+PYTHONPATH=src .venv/bin/python \
+  scripts/feature_adapter/summarize_clip_birdmix_v2_study.py
+```
+
+The summarizer requires exactly one complete run for every registered
+trial/seed cell. Missing, incomplete, or duplicate attempts are errors. It
+also verifies checksums, seed-invariant configs and input digests, source and
+target text prototypes, the CUB crosswalk, and selected-step/refit-step
+agreement. Baseline, adapted, and gain Top-1 are reported per seed and as the
+arithmetic mean with an unclipped two-sided 95% Student-t interval over the
+three registered seeds (`df=2`). By default, a new timestamp-and-summary-digest
+directory is created below the Drive run root's `summaries/` directory; an
+existing result is never overwritten.
+
 ## Required audit artifacts
 
 In addition to the adapter, validation history, CUB predictions, statistics,

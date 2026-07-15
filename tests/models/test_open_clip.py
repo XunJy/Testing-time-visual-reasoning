@@ -9,7 +9,12 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from ttvr.models.cached import CachedFeatureBackend, normalise_features
+from ttvr.models.cached import (
+    CachedFeatureBackend,
+    normalise_features,
+    torch_load_tensors,
+    validate_text_cache_file,
+)
 from ttvr.models.open_clip import (
     EVA02_CLIP_L14_336,
     OpenCLIPBackend,
@@ -188,6 +193,7 @@ class _TinyCachedBackend(CachedFeatureBackend):
             precision="fp32",
             text_batch_size=8,
             feature_dtype_name="torch.float32",
+            feature_dim=3,
             text_cache_path=cache_path,
         )
 
@@ -207,3 +213,82 @@ def test_text_cache_does_not_cross_checkpoint_identity(tmp_path: Path) -> None:
 
     assert matching.text_cache_size == 2
     assert different.text_cache_size == 0
+
+
+def test_immutable_preflight_rejects_text_cache_identity_mismatch(
+    tmp_path: Path,
+) -> None:
+    cache_path = tmp_path / "text.pt"
+    original = _TinyCachedBackend("checkpoint-a", cache_path)
+    original.warm_text_cache(("alpha", "beta"))
+    original.save_text_cache()
+
+    assert (
+        validate_text_cache_file(
+            cache_path,
+            cache_identity="checkpoint-a",
+            model_name="same-architecture",
+            precision="fp32",
+            dtype_name="torch.float32",
+            feature_dim=3,
+        )
+        == 2
+    )
+    with pytest.raises(RuntimeError, match="metadata mismatch"):
+        validate_text_cache_file(
+            cache_path,
+            cache_identity="checkpoint-b",
+            model_name="same-architecture",
+            precision="fp32",
+            dtype_name="torch.float32",
+            feature_dim=3,
+        )
+
+
+@pytest.mark.parametrize(
+    ("damage", "message"),
+    [
+        ("wrong-dimension", "dimension mismatch"),
+        ("non-finite", "Non-finite"),
+        ("non-unit", "Non-unit"),
+        ("duplicate-location", "one-to-one"),
+        ("orphan-row", "one-to-one"),
+    ],
+)
+def test_matching_text_cache_fails_closed_on_feature_or_alignment_damage(
+    tmp_path: Path,
+    damage: str,
+    message: str,
+) -> None:
+    cache_path = tmp_path / f"{damage}.pt"
+    original = _TinyCachedBackend("checkpoint-a", cache_path)
+    original.warm_text_cache(("alpha", "beta"))
+    original.save_text_cache()
+    payload = torch_load_tensors(cache_path)
+
+    if damage == "wrong-dimension":
+        payload["blocks"][0] = normalise_features(torch.ones((2, 4)))
+    elif damage == "non-finite":
+        payload["blocks"][0][0, 0] = float("nan")
+    elif damage == "non-unit":
+        payload["blocks"][0][0].mul_(0.5)
+    elif damage == "duplicate-location":
+        payload["locations"]["beta"] = payload["locations"]["alpha"]
+    elif damage == "orphan-row":
+        del payload["locations"]["beta"]
+    else:  # pragma: no cover - guarded by the parametrization above.
+        raise AssertionError(damage)
+    torch.save(payload, cache_path)
+
+    with pytest.raises(RuntimeError, match=message):
+        _TinyCachedBackend("checkpoint-a", cache_path)
+
+
+def test_matching_text_cache_fails_closed_on_serialization_damage(
+    tmp_path: Path,
+) -> None:
+    cache_path = tmp_path / "text.pt"
+    cache_path.write_bytes(b"not a torch payload")
+
+    with pytest.raises(RuntimeError, match="Cannot load text cache"):
+        _TinyCachedBackend("checkpoint-a", cache_path)

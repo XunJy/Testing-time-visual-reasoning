@@ -94,13 +94,10 @@ class DuplicateAuditConfig:
     def __post_init__(self) -> None:
         if self.exact_sha256_policy not in {"audit-only", "drop-later-source"}:
             raise ValueError(
-                "duplicate_audit.exact_sha256_policy must be audit-only or "
-                "drop-later-source"
+                "duplicate_audit.exact_sha256_policy must be audit-only or drop-later-source"
             )
         if self.perceptual_hash_policy != "report-only":
-            raise ValueError(
-                "duplicate_audit.perceptual_hash_policy must remain report-only"
-            )
+            raise ValueError("duplicate_audit.perceptual_hash_policy must remain report-only")
         if (
             type(self.perceptual_hamming_threshold) is not int
             or not 0 <= self.perceptual_hamming_threshold <= 8
@@ -215,14 +212,10 @@ def _source_specs(
         if row.get("validation_taxon_fraction") is not None
     }
     if top_level_fraction is not None and legacy_fractions:
-        raise ValueError(
-            "validation_taxon_fraction must appear only at source-config top level"
-        )
+        raise ValueError("validation_taxon_fraction must appear only at source-config top level")
     if top_level_fraction is None:
         if len(legacy_fractions) != 1:
-            raise ValueError(
-                "source config needs one top-level validation_taxon_fraction"
-            )
+            raise ValueError("source config needs one top-level validation_taxon_fraction")
         validation_taxon_fraction = next(iter(legacy_fractions))
     else:
         validation_taxon_fraction = float(top_level_fraction)
@@ -240,9 +233,9 @@ def _source_specs(
                 taxa=_resolve_one_glob(project_root, str(row["taxa"])),
                 train_cache=_resolve_one_glob(project_root, str(row["train_cache"])),
                 validation_cache=(
-                    None if validation_value is None else _resolve_one_glob(
-                        project_root, str(validation_value)
-                    )
+                    None
+                    if validation_value is None
+                    else _resolve_one_glob(project_root, str(validation_value))
                 ),
             )
         )
@@ -269,8 +262,7 @@ def _duplicate_audit_config(path: Path) -> DuplicateAuditConfig:
     unknown = sorted(raw.keys() - expected)
     if missing or unknown:
         raise ValueError(
-            f"duplicate_audit keys do not match schema; missing={missing}, "
-            f"unknown={unknown}"
+            f"duplicate_audit keys do not match schema; missing={missing}, unknown={unknown}"
         )
     return DuplicateAuditConfig(
         exact_sha256_policy=raw["exact_sha256_policy"],
@@ -518,11 +510,7 @@ def _near_phash_rows(
     for phash in sorted(occurrences_by_phash):
         value = int(phash, 16)
         keys = _phash_chunk_keys(value, threshold)
-        candidates = {
-            candidate
-            for key in keys
-            for candidate in buckets.get(key, ())
-        }
+        candidates = {candidate for key in keys for candidate in buckets.get(key, ())}
         for candidate in sorted(candidates):
             distance = (value ^ int(candidate, 16)).bit_count()
             if distance > threshold:
@@ -566,9 +554,7 @@ def _audit_cross_source_duplicates(
     for source in sources:
         active = {sample.source_sample_id for sample in source.train.dataset.samples}
         if source.validation is not None:
-            active.update(
-                sample.source_sample_id for sample in source.validation.dataset.samples
-            )
+            active.update(sample.source_sample_id for sample in source.validation.dataset.samples)
         active_ids[source.spec.dataset_id] = active
         for index, sample in enumerate(source.samples):
             occurrence = _sample_occurrence(
@@ -580,9 +566,7 @@ def _audit_cross_source_duplicates(
             if sample.phash:
                 phash_groups[sample.phash].append(occurrence)
 
-    dropped: dict[str, set[str]] = {
-        source.spec.dataset_id: set() for source in sources
-    }
+    dropped: dict[str, set[str]] = {source.spec.dataset_id: set() for source in sources}
     exact_rows: list[dict[str, Any]] = []
     for sha256, occurrences in sorted(sha_groups.items()):
         if len({str(row["dataset_id"]) for row in occurrences}) < 2:
@@ -637,10 +621,7 @@ def _audit_cross_source_duplicates(
                         int(row["manifest_index"]),
                     ),
                 ),
-                "taxon_conflict": len(
-                    {str(row["taxon_id"]) for row in occurrences}
-                )
-                > 1,
+                "taxon_conflict": len({str(row["taxon_id"]) for row in occurrences}) > 1,
                 "action": "report-only",
             }
         )
@@ -649,9 +630,7 @@ def _audit_cross_source_duplicates(
         phash_groups,
         threshold=config.perceptual_hamming_threshold,
     )
-    dropped_counts = {
-        dataset_id: len(sample_ids) for dataset_id, sample_ids in dropped.items()
-    }
+    dropped_counts = {dataset_id: len(sample_ids) for dataset_id, sample_ids in dropped.items()}
     audit = {
         "schema_version": 1,
         "scope": "all canonical rows reported; only configured train/validation rows fit",
@@ -988,7 +967,7 @@ def _prepare_source_tasks(
                         dropped_source_sample_ids=dropped,
                     ),
                 )
-            )
+            ),
         )
         refit_prepared: PreparedFeatureTask | None = None
         refit_status = "omitted-fewer-than-two-eligible-taxa"
@@ -1014,9 +993,7 @@ def _prepare_source_tasks(
             refit_status = "included"
 
         all_split_counts = Counter(sample.source_split for sample in source.samples)
-        active_ids = {
-            sample.source_sample_id for sample in source.train.dataset.samples
-        }
+        active_ids = {sample.source_sample_id for sample in source.train.dataset.samples}
         if source.validation is not None:
             active_ids.update(
                 sample.source_sample_id for sample in source.validation.dataset.samples
@@ -1033,8 +1010,7 @@ def _prepare_source_tasks(
                 "official_test_samples_used": 0,
                 "fit_eligible_samples_before_filters": len(active_ids),
                 "strict_cub_excluded_active_samples": sum(
-                    sample.source_sample_id in active_ids
-                    and sample.taxon_id in excluded_taxa
+                    sample.source_sample_id in active_ids and sample.taxon_id in excluded_taxa
                     for sample in source.samples
                 ),
                 "exact_duplicate_excluded_active_samples": len(dropped),
@@ -1060,8 +1036,7 @@ def _prepare_source_tasks(
         raise RuntimeError("No source retains a two-class selection-training task")
     if not validation_tasks:
         raise RuntimeError(
-            "Global validation split produced no source task with at least two "
-            "held-out taxa"
+            "Global validation split produced no source task with at least two held-out taxa"
         )
     if not refit_tasks:
         raise RuntimeError("No source retains a two-class refit task")
@@ -1169,12 +1144,35 @@ def _environment() -> dict[str, Any]:
     }
 
 
-def _source_digest(
+def _model_runtime_config(backend: CLIPBackend) -> dict[str, Any]:
+    """Serialize the identity verified by this model-consuming interpreter."""
+
+    installation = backend.openai_clip_installation
+    checkpoint = backend.openai_clip_checkpoint
+    if checkpoint is None:
+        raise RuntimeError("The formal CLIP run requires a verified local checkpoint")
+    return {
+        "cache_identity": backend.cache_identity,
+        "clip_distribution": installation.distribution,
+        "clip_version": installation.version,
+        "clip_repository_url": installation.repository_url,
+        "clip_commit": installation.commit_id,
+        "checkpoint_path": str(checkpoint.path),
+        "checkpoint_sha256": checkpoint.sha256,
+        "checkpoint_size_bytes": checkpoint.size_bytes,
+    }
+
+
+def _source_digest_paths(
     project_root: Path,
     dataset_ids: tuple[str, ...] = (),
-) -> str:
+) -> tuple[Path, ...]:
+    """Return every implementation file that can define the audited run."""
+
     paths: tuple[Path, ...] = (
         Path(__file__).resolve(),
+        project_root / "scripts/feature_adapter/cache_clip_manifest_features.py",
+        project_root / "scripts/feature_adapter/verify_clip_runtime.py",
         project_root / "src/ttvr/data/bird_manifest.py",
         project_root / "src/ttvr/data/birdnet.py",
         project_root / "src/ttvr/data/cub.py",
@@ -1184,6 +1182,7 @@ def _source_digest(
         project_root / "src/ttvr/methods/feature_adapter/model.py",
         project_root / "src/ttvr/methods/feature_adapter/tasks.py",
         project_root / "src/ttvr/methods/feature_adapter/training.py",
+        project_root / "src/ttvr/metrics.py",
         project_root / "src/ttvr/models/cached.py",
         project_root / "src/ttvr/models/clip.py",
     )
@@ -1197,8 +1196,30 @@ def _source_digest(
             project_root / "src/ttvr/data/bird_crops.py",
             project_root / "src/ttvr/data/visual_wetlandbirds.py",
         )
+    if any(dataset_id.startswith("usgs-aerial-avian-") for dataset_id in dataset_ids):
+        paths += (
+            project_root / "src/ttvr/data/bird_crops.py",
+            project_root / "src/ttvr/data/bird_source_archive.py",
+            project_root / "src/ttvr/data/birdnet_lock.py",
+            project_root / "src/ttvr/data/usgs_aerial_avian.py",
+        )
+    if any(dataset_id.startswith("nm-uas-waterfowl-") for dataset_id in dataset_ids):
+        paths += (
+            project_root / "src/ttvr/data/bird_crops.py",
+            project_root / "src/ttvr/data/bird_source_archive.py",
+            project_root / "src/ttvr/data/birdnet_lock.py",
+            project_root / "src/ttvr/data/nm_uas_waterfowl.py",
+        )
+    return tuple(sorted(set(paths), key=lambda value: str(value)))
+
+
+def _source_digest(
+    project_root: Path,
+    dataset_ids: tuple[str, ...] = (),
+) -> str:
+    paths = _source_digest_paths(project_root, dataset_ids)
     digest = hashlib.sha256()
-    for path in sorted(set(paths), key=lambda value: str(value)):
+    for path in paths:
         digest.update(path.relative_to(project_root).as_posix().encode())
         digest.update(b"\0")
         digest.update(path.read_bytes())
@@ -1230,10 +1251,7 @@ def _parse_args(project_root: Path) -> argparse.Namespace:
     parser.add_argument(
         "--runs-root",
         type=Path,
-        help=(
-            "Immutable run directory root. Defaults to "
-            "experiments/<experiment-id>/runs."
-        ),
+        help=("Immutable run directory root. Defaults to experiments/<experiment-id>/runs."),
     )
     parser.add_argument(
         "--experiment-id",
@@ -1260,9 +1278,7 @@ def _parse_args(project_root: Path) -> argparse.Namespace:
 def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     args = _parse_args(project_root)
-    identifier_characters = set(
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-"
-    )
+    identifier_characters = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-")
     if (
         not args.experiment_id
         or not args.experiment_id[0].isalnum()
@@ -1272,9 +1288,7 @@ def main() -> None:
         raise ValueError("experiment-id must be a filesystem-safe identifier")
     if not isinstance(args.protocol, str) or not args.protocol.strip():
         raise ValueError("protocol must be non-empty")
-    runs_root = args.runs_root or (
-        project_root / "experiments" / args.experiment_id / "runs"
-    )
+    runs_root = args.runs_root or (project_root / "experiments" / args.experiment_id / "runs")
     device = torch.device(args.device)
     class_names = read_cub_class_names(args.cub_class_names)
     crosswalk = build_cub_birdnet_crosswalk(args.cub_class_names, args.birdnet_csv)
@@ -1293,10 +1307,17 @@ def main() -> None:
         logit_scale=100.0,
         seed=args.seed,
     )
+    backend = CLIPBackend(
+        device=device,
+        precision="fp32",
+        model_cache_dir=args.model_cache_dir,
+        text_cache_path=args.text_cache,
+    )
     resolved_config = {
         "experiment": args.experiment_id,
         "protocol": args.protocol,
         "model": "OpenAI CLIP ViT-L/14@336px fp32",
+        "model_runtime": _model_runtime_config(backend),
         "method": {
             "feature_dim": 768,
             "hidden_dim": args.hidden_dim,
@@ -1312,9 +1333,7 @@ def main() -> None:
             {
                 "dataset_id": spec.dataset_id,
                 "source_metadata": str((spec.samples.parent / "source.json").resolve()),
-                "source_metadata_sha256": sha256_file(
-                    spec.samples.parent / "source.json"
-                ),
+                "source_metadata_sha256": sha256_file(spec.samples.parent / "source.json"),
                 "samples": str(spec.samples),
                 "samples_sha256": sha256_file(spec.samples),
                 "taxa": str(spec.taxa),
@@ -1325,9 +1344,7 @@ def main() -> None:
                     None if spec.validation_cache is None else str(spec.validation_cache)
                 ),
                 "validation_cache_sha256": (
-                    None
-                    if spec.validation_cache is None
-                    else sha256_file(spec.validation_cache)
+                    None if spec.validation_cache is None else sha256_file(spec.validation_cache)
                 ),
             }
             for spec in specs
@@ -1359,12 +1376,6 @@ def main() -> None:
         },
     )
 
-    backend = CLIPBackend(
-        device=device,
-        precision="fp32",
-        model_cache_dir=args.model_cache_dir,
-        text_cache_path=args.text_cache,
-    )
     sources = _load_sources(specs, backend)
     duplicate_audit, duplicate_excluded_sample_ids = _audit_cross_source_duplicates(
         sources,
@@ -1547,8 +1558,7 @@ def main() -> None:
         "disabled_source_placeholder_count": len(disabled_sources),
         "source_validation_task_count": len(validation_tasks),
         "source_validation_omitted_count": sum(
-            row["unseen_validation"]["status"] != "included"
-            for row in source_partition_audit
+            row["unseen_validation"]["status"] != "included" for row in source_partition_audit
         ),
         "exact_duplicate_images_excluded": duplicate_audit["summary"][
             "exact_duplicate_rows_dropped_total"

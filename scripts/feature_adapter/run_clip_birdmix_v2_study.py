@@ -15,6 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ttvr.gpu_lock import DEFAULT_GPU_LOCK_PATH, GPULockBusyError, exclusive_gpu_lock
+from ttvr.models.clip import DEFAULT_CLIP_MODEL, OPENAI_CLIP_COMMIT, VIT_L14_336_CHECKPOINT_SHA256
+
 _SLUG = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
 _EXPERIMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 _V2_EXPERIMENT_ID = "07_feature_adapter_clip_birdmix_v2_cub"
@@ -46,9 +49,7 @@ _COMMON_POSITIVE_INTEGER_KEYS = {
     "hidden_dim",
 }
 _COMMON_FLOAT_KEYS = {"learning_rate", "weight_decay", "identity_weight"}
-_COMMON_KEYS = _COMMON_PATH_KEYS | _COMMON_POSITIVE_INTEGER_KEYS | _COMMON_FLOAT_KEYS | {
-    "device"
-}
+_COMMON_KEYS = _COMMON_PATH_KEYS | _COMMON_POSITIVE_INTEGER_KEYS | _COMMON_FLOAT_KEYS | {"device"}
 _ENABLED_SOURCE_KEYS = {
     "enabled",
     "dataset_id",
@@ -296,9 +297,7 @@ def load_study_config(path: Path | str, project_root: Path | str) -> StudyConfig
         device=common_value["device"],
     )
     if experiment_id not in common.runs_root.parts:
-        raise StudyConfigError(
-            "common.runs_root must be an experiment-07-specific directory"
-        )
+        raise StudyConfigError("common.runs_root must be an experiment-07-specific directory")
     return StudyConfig(
         experiment_id=experiment_id,
         protocol=protocol,
@@ -382,17 +381,86 @@ def _resolve_one_source_path(project_root: Path, value: object, *, context: str)
     if any(character in str(path) for character in "*?["):
         matches = sorted(path.parent.glob(path.name))
         if len(matches) != 1:
-            raise StudyConfigError(
-                f"{context} must resolve exactly once: {path} -> {matches}"
-            )
+            raise StudyConfigError(f"{context} must resolve exactly once: {path} -> {matches}")
         path = matches[0]
     return path
 
 
-def preflight_runtime_inputs(config: StudyConfig, project_root: Path | str) -> None:
+def _subprocess_environment(project_root: Path) -> dict[str, str]:
+    environment = os.environ.copy()
+    source_root = str(project_root / "src")
+    inherited = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = (
+        source_root if not inherited else os.pathsep.join((source_root, inherited))
+    )
+    return environment
+
+
+def _preflight_clip_runtime(
+    common: CommonInputs,
+    project_root: Path,
+    *,
+    python_executable: Path | str,
+) -> dict[str, Any]:
+    """Verify CLIP using the exact interpreter that will consume the caches."""
+
+    verifier = project_root / "scripts/feature_adapter/verify_clip_runtime.py"
+    command = (
+        str(python_executable),
+        str(verifier),
+        "--model-cache-dir",
+        str(common.model_cache_dir),
+        "--text-cache",
+        str(common.text_cache),
+    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=project_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            env=_subprocess_environment(project_root),
+        )
+    except OSError as error:
+        raise StudyConfigError(
+            f"Cannot execute CLIP preflight interpreter {python_executable}: {error}"
+        ) from error
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or str(error)).strip()
+        raise StudyConfigError(
+            f"OpenAI CLIP runtime identity check failed in {python_executable}: {detail}"
+        ) from error
+    try:
+        identity = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise StudyConfigError(
+            f"CLIP runtime preflight returned invalid JSON: {completed.stdout!r}"
+        ) from error
+    expected = {
+        "cache_identity": f"openai-clip:{DEFAULT_CLIP_MODEL}@{OPENAI_CLIP_COMMIT}",
+        "clip_commit": OPENAI_CLIP_COMMIT,
+        "checkpoint_sha256": VIT_L14_336_CHECKPOINT_SHA256,
+    }
+    if not isinstance(identity, dict) or any(
+        identity.get(key) != value for key, value in expected.items()
+    ):
+        raise StudyConfigError(
+            f"CLIP runtime preflight identity mismatch: expected {expected}, found {identity!r}"
+        )
+    return identity
+
+
+def preflight_runtime_inputs(
+    config: StudyConfig,
+    project_root: Path | str,
+    *,
+    python_executable: Path | str = sys.executable,
+) -> None:
     root = Path(project_root).expanduser().resolve()
     files = {
         "runner": root / "scripts/feature_adapter/run_clip_multi_bird.py",
+        "CLIP runtime verifier": root / "scripts/feature_adapter/verify_clip_runtime.py",
         "CUB class names": config.common.cub_class_names,
         "BirdNET taxonomy CSV": config.common.birdnet_csv,
         "CUB feature cache": config.common.cub_feature_cache,
@@ -407,6 +475,11 @@ def preflight_runtime_inputs(config: StudyConfig, project_root: Path | str) -> N
     for label, path in directories.items():
         if not path.is_dir():
             raise StudyConfigError(f"Missing {label}: {path}")
+    _preflight_clip_runtime(
+        config.common,
+        root,
+        python_executable=python_executable,
+    )
     for trial in config.source_trials:
         for index, row in enumerate(_validated_source_rows(trial)):
             if row.get("enabled", True) is False:
@@ -441,12 +514,7 @@ def run_commands(
     dry_run: bool,
 ) -> None:
     root = Path(project_root).expanduser().resolve()
-    environment = os.environ.copy()
-    source_root = str(root / "src")
-    inherited = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = (
-        source_root if not inherited else os.pathsep.join((source_root, inherited))
-    )
+    environment = _subprocess_environment(root)
     for index, command in enumerate(commands, start=1):
         print(
             f"[{index}/{len(commands)}] trial={command.trial_id} seed={command.seed}\n"
@@ -457,18 +525,48 @@ def run_commands(
             subprocess.run(command.argv, cwd=root, check=True, env=environment)
 
 
+def run_formal_matrix(
+    config: StudyConfig,
+    commands: tuple[TrialCommand, ...],
+    project_root: Path | str,
+    *,
+    gpu_lock: Path | str,
+    python_executable: Path | str,
+) -> None:
+    """Preflight and run all seeds while excluding cooperating cache writers."""
+
+    try:
+        with exclusive_gpu_lock(gpu_lock, purpose="formal BirdMix-v2 matrix"):
+            preflight_runtime_inputs(
+                config,
+                project_root,
+                python_executable=python_executable,
+            )
+            run_commands(commands, project_root, dry_run=False)
+    except GPULockBusyError as error:
+        raise StudyConfigError(str(error)) from error
+
+
 def _parse_args(project_root: Path) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--study-config",
         type=Path,
         default=(
-            project_root
-            / "experiments/07_feature_adapter_clip_birdmix_v2_cub/configs/"
+            project_root / "experiments/07_feature_adapter_clip_birdmix_v2_cub/configs/"
             "clip_birdmix_v2_study.json"
         ),
     )
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
+    parser.add_argument(
+        "--gpu-lock",
+        type=Path,
+        default=DEFAULT_GPU_LOCK_PATH,
+        help=(
+            "Advisory lock shared with feature-cache jobs. The formal launcher "
+            "holds it across preflight and all three seeds."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -483,9 +581,16 @@ def main() -> None:
             project_root,
             python_executable=args.python,
         )
-        if not args.dry_run:
-            preflight_runtime_inputs(config, project_root)
-        run_commands(commands, project_root, dry_run=args.dry_run)
+        if args.dry_run:
+            run_commands(commands, project_root, dry_run=True)
+        else:
+            run_formal_matrix(
+                config,
+                commands,
+                project_root,
+                gpu_lock=args.gpu_lock,
+                python_executable=args.python,
+            )
     except StudyConfigError as error:
         raise SystemExit(f"BirdMix-v2 preflight failed: {error}") from error
     except subprocess.CalledProcessError as error:

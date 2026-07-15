@@ -25,6 +25,148 @@ _IMAGE_CACHE_FORMAT = 2
 _IMAGE_SHARD_FORMAT = 1
 
 
+def _load_text_cache_payload(path: Path) -> Any:
+    """Load one text cache and turn serialization damage into a clear failure."""
+
+    try:
+        return torch_load_tensors(path)
+    except Exception as error:
+        raise RuntimeError(f"Cannot load text cache: {path}: {error}") from error
+
+
+def _validated_text_cache_payload(
+    payload: Any,
+    *,
+    cache_path: Path,
+    cache_identity: str,
+    model_name: str,
+    precision: str,
+    dtype_name: str,
+    feature_dim: int | None,
+    allow_metadata_mismatch: bool,
+) -> tuple[list[Tensor], dict[str, tuple[int, int]]] | None:
+    """Deep-validate a persistent text cache without trusting its metadata."""
+
+    if not isinstance(payload, dict) or payload.get("format") != _TEXT_CACHE_FORMAT:
+        raise RuntimeError(f"Invalid text cache payload: {cache_path}")
+    metadata_fields = {
+        "cache_identity": cache_identity,
+        "model_name": model_name,
+        "precision": precision,
+        "dtype": dtype_name,
+    }
+    metadata_matches = all(payload.get(key) == value for key, value in metadata_fields.items())
+    if not metadata_matches:
+        if allow_metadata_mismatch:
+            return None
+        mismatches = {
+            key: {"expected": expected, "found": payload.get(key)}
+            for key, expected in metadata_fields.items()
+            if payload.get(key) != expected
+        }
+        raise RuntimeError(f"Text cache metadata mismatch in {cache_path}: {mismatches}")
+
+    blocks = payload.get("blocks")
+    locations = payload.get("locations")
+    if not isinstance(blocks, list):
+        raise RuntimeError(f"Invalid tensor blocks in text cache: {cache_path}")
+    if not isinstance(locations, dict):
+        raise RuntimeError(f"Invalid locations in text cache: {cache_path}")
+
+    parsed_blocks: list[Tensor] = []
+    inferred_dim = feature_dim
+    for block_index, block in enumerate(blocks):
+        if not (
+            isinstance(block, Tensor)
+            and block.layout == torch.strided
+            and block.ndim == 2
+            and block.shape[0] > 0
+            and block.shape[1] > 0
+            and block.is_floating_point()
+            and str(block.dtype) == dtype_name
+        ):
+            raise RuntimeError(f"Invalid tensor block {block_index} in text cache: {cache_path}")
+        if inferred_dim is None:
+            inferred_dim = block.shape[1]
+        if block.shape[1] != inferred_dim:
+            raise RuntimeError(
+                f"Text feature dimension mismatch in {cache_path}: "
+                f"expected {inferred_dim}, found {block.shape[1]} in block {block_index}"
+            )
+        if not bool(torch.isfinite(block).all()):
+            raise RuntimeError(f"Non-finite text features in {cache_path}, block {block_index}")
+        norms = torch.linalg.vector_norm(block.detach().float(), dim=1)
+        if not torch.allclose(
+            norms,
+            torch.ones_like(norms),
+            rtol=1e-3,
+            atol=1e-3,
+        ):
+            raise RuntimeError(f"Non-unit text features in {cache_path}, block {block_index}")
+        parsed_blocks.append(block.detach().cpu().contiguous())
+
+    parsed_locations: dict[str, tuple[int, int]] = {}
+    for text, location in locations.items():
+        if not (
+            isinstance(text, str)
+            and text.strip()
+            and isinstance(location, (list, tuple))
+            and len(location) == 2
+            and all(type(value) is int for value in location)
+        ):
+            raise RuntimeError(f"Invalid location entry in {cache_path}")
+        block_index, row_index = location
+        if not (
+            0 <= block_index < len(parsed_blocks)
+            and 0 <= row_index < parsed_blocks[block_index].shape[0]
+        ):
+            raise RuntimeError(f"Out-of-range location in {cache_path}")
+        parsed_locations[text] = (block_index, row_index)
+
+    expected_locations = {
+        (block_index, row_index)
+        for block_index, block in enumerate(parsed_blocks)
+        for row_index in range(block.shape[0])
+    }
+    actual_locations = set(parsed_locations.values())
+    if len(actual_locations) != len(parsed_locations) or actual_locations != expected_locations:
+        raise RuntimeError(f"Text cache keys and tensor rows are not one-to-one in {cache_path}")
+    return parsed_blocks, parsed_locations
+
+
+def validate_text_cache_file(
+    path: Path | str,
+    *,
+    cache_identity: str,
+    model_name: str,
+    precision: str,
+    dtype_name: str,
+    feature_dim: int | None = None,
+) -> int:
+    """Fail closed unless an existing text cache exactly matches and is sound.
+
+    Returns the number of validated prompt keys. This stricter entry point is
+    intended for immutable experiment preflights; backends may still ignore a
+    structurally valid cache belonging to a different model identity.
+    """
+
+    cache_path = Path(path).expanduser()
+    if not cache_path.is_file():
+        raise RuntimeError(f"Missing text cache: {cache_path}")
+    result = _validated_text_cache_payload(
+        _load_text_cache_payload(cache_path),
+        cache_path=cache_path,
+        cache_identity=cache_identity,
+        model_name=model_name,
+        precision=precision,
+        dtype_name=dtype_name,
+        feature_dim=feature_dim,
+        allow_metadata_mismatch=False,
+    )
+    assert result is not None
+    return len(result[1])
+
+
 def torch_load_tensors(path: Path) -> Any:
     """Load tensor-only caches safely across supported PyTorch versions."""
 
@@ -173,18 +315,22 @@ class CachedFeatureBackend:
         precision: str,
         text_batch_size: int,
         feature_dtype_name: str,
+        feature_dim: int | None = None,
         text_cache_path: Path | str | None = None,
     ) -> None:
         if text_batch_size <= 0:
             raise ValueError("text_batch_size must be positive")
         if not model_name.strip() or not cache_identity.strip():
             raise ValueError("model_name and cache_identity must not be empty")
+        if feature_dim is not None and feature_dim <= 0:
+            raise ValueError("feature_dim must be positive when provided")
         self.model_name = model_name
         self.cache_identity = cache_identity
         self.device = device
         self.precision = precision
         self.text_batch_size = text_batch_size
         self._dtype_name = feature_dtype_name
+        self._feature_dim = feature_dim
 
         # Each block is contiguous; locations avoid 150k+ independent tensor
         # storages when the complete CUB prompt cache is serialised.
@@ -232,44 +378,19 @@ class CachedFeatureBackend:
         if not cache_path.is_file():
             return
 
-        payload = torch_load_tensors(cache_path)
-        if not isinstance(payload, dict):
-            raise RuntimeError(f"Invalid text cache payload: {cache_path}")
-        metadata_matches = (
-            payload.get("format") == _TEXT_CACHE_FORMAT
-            and payload.get("cache_identity") == self.cache_identity
-            and payload.get("model_name") == self.model_name
-            and payload.get("precision") == self.precision
-            and payload.get("dtype") == self._dtype_name
+        result = _validated_text_cache_payload(
+            _load_text_cache_payload(cache_path),
+            cache_path=cache_path,
+            cache_identity=self.cache_identity,
+            model_name=self.model_name,
+            precision=self.precision,
+            dtype_name=self._dtype_name,
+            feature_dim=self._feature_dim,
+            allow_metadata_mismatch=True,
         )
-        if not metadata_matches:
+        if result is None:
             return
-        blocks = payload.get("blocks")
-        locations = payload.get("locations")
-        if not isinstance(blocks, list) or not all(
-            isinstance(block, Tensor) and block.ndim == 2 for block in blocks
-        ):
-            raise RuntimeError(f"Invalid tensor blocks in text cache: {cache_path}")
-        if not isinstance(locations, dict):
-            raise RuntimeError(f"Invalid locations in text cache: {cache_path}")
-
-        parsed_locations: dict[str, tuple[int, int]] = {}
-        for text, location in locations.items():
-            if not (
-                isinstance(text, str)
-                and isinstance(location, (list, tuple))
-                and len(location) == 2
-                and all(isinstance(value, int) for value in location)
-            ):
-                raise RuntimeError(f"Invalid location entry in {cache_path}")
-            block_index, row_index = location
-            if not (
-                0 <= block_index < len(blocks) and 0 <= row_index < blocks[block_index].shape[0]
-            ):
-                raise RuntimeError(f"Out-of-range location in {cache_path}")
-            parsed_locations[text] = (block_index, row_index)
-        self._text_blocks = [block.contiguous() for block in blocks]
-        self._text_locations = parsed_locations
+        self._text_blocks, self._text_locations = result
 
     def save_text_cache(self) -> Path | None:
         """Atomically persist all cached text features, if a path is configured."""
@@ -325,6 +446,28 @@ class CachedFeatureBackend:
                 if features.ndim != 2 or features.shape[0] != len(chunk):
                     raise RuntimeError("Text encoder returned an invalid feature matrix")
                 block = features.detach().cpu().contiguous()
+                if self._feature_dim is None:
+                    self._feature_dim = block.shape[1]
+                validation = _validated_text_cache_payload(
+                    {
+                        "format": _TEXT_CACHE_FORMAT,
+                        "cache_identity": self.cache_identity,
+                        "model_name": self.model_name,
+                        "precision": self.precision,
+                        "dtype": self._dtype_name,
+                        "blocks": [block],
+                        "locations": {text: (0, row_index) for row_index, text in enumerate(chunk)},
+                    },
+                    cache_path=self._text_cache_path or Path("<in-memory-text-cache>"),
+                    cache_identity=self.cache_identity,
+                    model_name=self.model_name,
+                    precision=self.precision,
+                    dtype_name=self._dtype_name,
+                    feature_dim=self._feature_dim,
+                    allow_metadata_mismatch=False,
+                )
+                assert validation is not None
+                block = validation[0][0]
                 block_index = len(self._text_blocks)
                 self._text_blocks.append(block)
                 for row_index, text in enumerate(chunk):

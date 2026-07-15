@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -81,9 +82,7 @@ def test_v2_drive_paths_use_the_existing_space_named_root() -> None:
 def test_v2_config_rejects_an_enabled_source_without_locked_paths(
     tmp_path: Path,
 ) -> None:
-    source = json.loads(
-        (EXPERIMENT_ROOT / "configs/birdmix_v2.json").read_text(encoding="utf-8")
-    )
+    source = json.loads((EXPERIMENT_ROOT / "configs/birdmix_v2.json").read_text(encoding="utf-8"))
     source["sources"][-1].pop("train_cache")
     source_path = tmp_path / "sources.json"
     source_path.write_text(json.dumps(source), encoding="utf-8")
@@ -95,9 +94,7 @@ def test_v2_config_rejects_an_enabled_source_without_locked_paths(
 
 def test_v2_json_schemas_are_valid_json_and_lock_versions() -> None:
     source_schema = json.loads(
-        (EXPERIMENT_ROOT / "schemas/source_config.schema.json").read_text(
-            encoding="utf-8"
-        )
+        (EXPERIMENT_ROOT / "schemas/source_config.schema.json").read_text(encoding="utf-8")
     )
     study_schema = json.loads(
         (EXPERIMENT_ROOT / "schemas/study.schema.json").read_text(encoding="utf-8")
@@ -127,3 +124,149 @@ def test_v2_dry_run_does_not_start_subprocess(
     output = capsys.readouterr().out
     assert output.count("run_clip_multi_bird.py") == 3
     assert output.count("07_feature_adapter_clip_birdmix_v2_cub") >= 3
+
+
+def test_v2_main_dry_run_does_not_acquire_gpu_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        study,
+        "_parse_args",
+        lambda project_root: study.argparse.Namespace(
+            study_config=STUDY_CONFIG,
+            python=Path("python3"),
+            gpu_lock=tmp_path / "must-not-be-created.lock",
+            dry_run=True,
+        ),
+    )
+    monkeypatch.setattr(
+        study,
+        "run_commands",
+        lambda commands, project_root, *, dry_run: calls.append(dry_run),
+    )
+    monkeypatch.setattr(
+        study,
+        "run_formal_matrix",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("dry-run must not enter the formal lock")
+        ),
+    )
+
+    study.main()
+
+    assert calls == [True]
+    assert not (tmp_path / "must-not-be-created.lock").exists()
+
+
+def test_v2_preflight_runs_in_selected_python_and_pins_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = study.load_study_config(STUDY_CONFIG, PROJECT_ROOT)
+    text_cache = tmp_path / "text.pt"
+    text_cache.write_bytes(b"validated by the test double")
+    common = replace(
+        config.common,
+        model_cache_dir=tmp_path,
+        text_cache=text_cache,
+    )
+    selected_python = tmp_path / "selected-python"
+    calls: dict[str, object] = {}
+    identity = {
+        "cache_identity": ("openai-clip:ViT-L/14@336px@a1d071733d7111c9c014f024669f959182114e33"),
+        "clip_commit": "a1d071733d7111c9c014f024669f959182114e33",
+        "checkpoint_sha256": ("3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02"),
+    }
+
+    def run(command: tuple[str, ...], **kwargs: object) -> object:
+        calls["command"] = command
+        calls["kwargs"] = kwargs
+        return study.subprocess.CompletedProcess(command, 0, stdout=json.dumps(identity))
+
+    monkeypatch.setattr(study.subprocess, "run", run)
+
+    actual = study._preflight_clip_runtime(
+        common,
+        tmp_path,
+        python_executable=selected_python,
+    )
+
+    command = calls["command"]
+    assert isinstance(command, tuple)
+    assert command[0] == str(selected_python)
+    assert command[1].endswith("scripts/feature_adapter/verify_clip_runtime.py")
+    assert command[-4:] == (
+        "--model-cache-dir",
+        str(tmp_path),
+        "--text-cache",
+        str(text_cache),
+    )
+    kwargs = calls["kwargs"]
+    assert isinstance(kwargs, dict)
+    assert kwargs["cwd"] == tmp_path
+    assert actual == identity
+
+
+def test_v2_preflight_wraps_clip_identity_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = study.load_study_config(STUDY_CONFIG, PROJECT_ROOT)
+    common = replace(config.common, model_cache_dir=tmp_path, text_cache=tmp_path / "new.pt")
+
+    def fail(command: tuple[str, ...], **kwargs: object) -> object:
+        raise study.subprocess.CalledProcessError(
+            1,
+            command,
+            stderr="wrong commit",
+        )
+
+    monkeypatch.setattr(study.subprocess, "run", fail)
+
+    with pytest.raises(study.StudyConfigError, match="wrong commit"):
+        study._preflight_clip_runtime(
+            common,
+            tmp_path,
+            python_executable=tmp_path / "selected-python",
+        )
+
+
+def test_formal_matrix_holds_gpu_lock_across_preflight_and_all_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = study.load_study_config(STUDY_CONFIG, PROJECT_ROOT)
+    commands = study.build_trial_commands(config, PROJECT_ROOT)
+    lock_path = tmp_path / "gpu.lock"
+    events: list[str] = []
+
+    def assert_locked(stage: str) -> None:
+        with pytest.raises(study.GPULockBusyError, match="lock is busy"):
+            with study.exclusive_gpu_lock(lock_path, purpose="competing job"):
+                pass
+        events.append(stage)
+
+    monkeypatch.setattr(
+        study,
+        "preflight_runtime_inputs",
+        lambda config, project_root, *, python_executable: assert_locked("preflight"),
+    )
+    monkeypatch.setattr(
+        study,
+        "run_commands",
+        lambda commands, project_root, *, dry_run: assert_locked("commands"),
+    )
+
+    study.run_formal_matrix(
+        config,
+        commands,
+        PROJECT_ROOT,
+        gpu_lock=lock_path,
+        python_executable="selected-python",
+    )
+
+    assert events == ["preflight", "commands"]
+    with study.exclusive_gpu_lock(lock_path, purpose="after matrix"):
+        pass

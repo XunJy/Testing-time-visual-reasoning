@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +14,16 @@ from ttvr.methods.fudd.evaluation import _batched_fudd_predictions, rerank_candi
 from ttvr.methods.fudd.prompts import CubPromptRepository
 from ttvr.metrics import ordered_predictions
 from ttvr.models import CLIPBackend, TextFeatureTable
+from ttvr.models.clip import (
+    OPENAI_CLIP_COMMIT,
+    OPENAI_CLIP_REPOSITORY,
+    VIT_L14_336_CHECKPOINT_FILENAME,
+    VIT_L14_336_CHECKPOINT_SHA256,
+    OpenAIClipCheckpoint,
+    OpenAIClipInstallation,
+    verify_openai_clip_checkpoint,
+    verify_openai_clip_installation,
+)
 
 
 class _FakeClipModel:
@@ -29,6 +42,71 @@ class _FakeClipModel:
         return self
 
 
+class _FakeClipDistribution:
+    version = "1.0"
+    metadata = {"Name": "clip"}
+
+    def __init__(self, direct_url: dict[str, object]) -> None:
+        self.direct_url = direct_url
+
+    def read_text(self, filename: str) -> str | None:
+        assert filename == "direct_url.json"
+        return json.dumps(self.direct_url)
+
+
+def test_openai_clip_installation_requires_exact_pep610_commit(monkeypatch) -> None:
+    direct_url = {
+        "url": OPENAI_CLIP_REPOSITORY,
+        "vcs_info": {"vcs": "git", "commit_id": OPENAI_CLIP_COMMIT},
+    }
+    monkeypatch.setattr(
+        "ttvr.models.clip.importlib.metadata.distribution",
+        lambda name: _FakeClipDistribution(direct_url),
+    )
+
+    identity = verify_openai_clip_installation(expected_commit=OPENAI_CLIP_COMMIT)
+    assert identity.commit_id == OPENAI_CLIP_COMMIT
+    assert identity.repository_url == OPENAI_CLIP_REPOSITORY
+
+    direct_url["vcs_info"]["commit_id"] = "0" * 40
+    with pytest.raises(RuntimeError, match="commit mismatch"):
+        verify_openai_clip_installation(expected_commit=OPENAI_CLIP_COMMIT)
+
+
+def test_openai_clip_checkpoint_requires_exact_sha256(tmp_path: Path) -> None:
+    payload = b"locked OpenAI CLIP weights"
+    checkpoint = tmp_path / "ViT-L-14-336px.pt"
+    checkpoint.write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+
+    identity = verify_openai_clip_checkpoint(
+        tmp_path,
+        model_name="ViT-L/14@336px",
+        checkpoint_filename=checkpoint.name,
+        expected_sha256=digest,
+    )
+    assert identity.sha256 == digest
+    assert identity.size_bytes == len(payload)
+
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        verify_openai_clip_checkpoint(
+            tmp_path,
+            model_name="ViT-L/14@336px",
+            checkpoint_filename=checkpoint.name,
+            expected_sha256="0" * 64,
+        )
+
+
+def _verified_installation(commit_id: str = OPENAI_CLIP_COMMIT) -> OpenAIClipInstallation:
+    return OpenAIClipInstallation(
+        distribution="clip",
+        version="1.0",
+        repository_url=OPENAI_CLIP_REPOSITORY,
+        vcs="git",
+        commit_id=commit_id,
+    )
+
+
 def test_official_precision_loads_on_cpu_before_moving_to_cuda(monkeypatch) -> None:
     calls: list[object] = []
 
@@ -38,6 +116,10 @@ def test_official_precision_loads_on_cpu_before_moving_to_cuda(monkeypatch) -> N
 
     monkeypatch.setitem(sys.modules, "clip", SimpleNamespace(load=fake_load))
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        "ttvr.models.clip.verify_openai_clip_installation",
+        lambda **kwargs: _verified_installation(),
+    )
 
     official = CLIPBackend(device="cuda", precision="fp32")
     native = CLIPBackend(device="cuda", precision="native")
@@ -46,6 +128,57 @@ def test_official_precision_loads_on_cpu_before_moving_to_cuda(monkeypatch) -> N
     assert official.model.moved_to == torch.device("cuda")
     assert native.model.moved_to is None
     assert official.feature_dtype_name == "torch.float32"
+
+
+def test_backend_identity_comes_from_verified_runtime_and_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    actual_commit = "b" * 40
+    calls: dict[str, object] = {}
+
+    def fake_load(model_name, *, device, jit, download_root):
+        calls["load"] = (model_name, device, jit, download_root)
+        return _FakeClipModel(), object()
+
+    def verify_installation(**kwargs: object) -> OpenAIClipInstallation:
+        calls["installation"] = kwargs
+        return _verified_installation(actual_commit)
+
+    def verify_checkpoint(*args: object, **kwargs: object) -> OpenAIClipCheckpoint:
+        calls["checkpoint"] = (args, kwargs)
+        return OpenAIClipCheckpoint(
+            model_name="ViT-L/14@336px",
+            path=tmp_path / VIT_L14_336_CHECKPOINT_FILENAME,
+            sha256=VIT_L14_336_CHECKPOINT_SHA256,
+            size_bytes=123,
+        )
+
+    monkeypatch.setitem(sys.modules, "clip", SimpleNamespace(load=fake_load))
+    monkeypatch.setattr(
+        "ttvr.models.clip.verify_openai_clip_installation",
+        verify_installation,
+    )
+    monkeypatch.setattr(
+        "ttvr.models.clip.verify_openai_clip_checkpoint",
+        verify_checkpoint,
+    )
+
+    backend = CLIPBackend(device="cpu", model_cache_dir=tmp_path)
+
+    assert calls["installation"] == {"expected_commit": OPENAI_CLIP_COMMIT}
+    assert calls["checkpoint"] == (
+        (tmp_path,),
+        {
+            "model_name": "ViT-L/14@336px",
+            "checkpoint_filename": VIT_L14_336_CHECKPOINT_FILENAME,
+            "expected_sha256": VIT_L14_336_CHECKPOINT_SHA256,
+        },
+    )
+    assert backend.cache_identity == f"openai-clip:ViT-L/14@336px@{actual_commit}"
+    assert backend.openai_clip_installation.commit_id == actual_commit
+    assert backend.openai_clip_checkpoint is not None
+    assert backend.openai_clip_checkpoint.sha256 == VIT_L14_336_CHECKPOINT_SHA256
 
 
 def test_prompt_pooling_matches_official_normalise_mean_normalise() -> None:
