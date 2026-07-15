@@ -12,11 +12,13 @@ from .data.cub import (
 )
 from .methods.fudd.config import OFFICIAL_CLIP_MODEL, OFFICIAL_CLIP_PRECISION, FuDDConfig
 from .methods.fudd.evaluation import (
+    CandidateRerankResult,
     EvaluationReport,
     FuDDMetrics,
     ParityReport,
     PredictionRecord,
     evaluate_cub,
+    rerank_candidates,
     run_clip_cub_experiment,
 )
 from .methods.fudd.prompts import (
@@ -29,6 +31,7 @@ from .methods.fudd.prompts import (
     DifferentialDescription,
     download_official_prompts,
     load_official_prompts,
+    load_pair_overrides,
     verify_official_prompt_assets,
 )
 from .metrics import (
@@ -40,19 +43,31 @@ from .metrics import (
     ordered_predictions,
     topk_hits,
 )
-from .models import CLIPBackend, ImageFeatureSet, TextFeatureTable, VisionLanguageBackend
+from .models import (
+    EVA02_CLIP_L14_336,
+    OPEN_CLIP_TORCH_VERSION,
+    TIMM_VERSION,
+    CLIPBackend,
+    ImageFeatureSet,
+    OpenCLIPBackend,
+    OpenCLIPCheckpoint,
+    TextFeatureTable,
+    VisionLanguageBackend,
+)
 
 __all__ = [
     "CLIPBackend",
     "CUB200Dataset",
     "CUB_CLASS_COUNT",
     "CUB_PAIR_COUNT",
+    "CandidateRerankResult",
     "ClassPairDescriptions",
     "CubPromptRepository",
     "CubSample",
     "CubValidationReport",
     "DEFAULT_TEMPLATE",
     "DifferentialDescription",
+    "EVA02_CLIP_L14_336",
     "EvaluationReport",
     "FuDDConfig",
     "FUDD_OFFICIAL_COMMIT",
@@ -60,9 +75,13 @@ __all__ = [
     "ImageFeatureSet",
     "OFFICIAL_CLIP_MODEL",
     "OFFICIAL_CLIP_PRECISION",
+    "OPEN_CLIP_TORCH_VERSION",
+    "OpenCLIPBackend",
+    "OpenCLIPCheckpoint",
     "ParityReport",
     "PredictionRecord",
     "TextFeatureTable",
+    "TIMM_VERSION",
     "TopKAccuracy",
     "TransferCounts",
     "VisionLanguageBackend",
@@ -74,8 +93,10 @@ __all__ = [
     "download_official_prompts",
     "evaluate_cub",
     "load_official_prompts",
+    "load_pair_overrides",
     "ordered_predictions",
     "prepare_cub",
+    "rerank_candidates",
     "run_clip_cub_experiment",
     "topk_hits",
     "validate_class_name_alignment",

@@ -1,0 +1,35 @@
+{
+  "algorithm": {
+    "bootstrap": "paired-nonparametric-percentile-bootstrap-top1-accuracy-gain",
+    "mcnemar": "exact-two-sided-binomial-mcnemar"
+  },
+  "bootstrap": {
+    "baseline_accuracy_percent": 86.93476009665171,
+    "chunk_size": 256,
+    "ci_lower_pp": -0.3969623748705558,
+    "ci_upper_pp": 0.742147048671039,
+    "comparison_accuracy_percent": 87.10735243355195,
+    "confidence_level": 0.95,
+    "gain_pp": 0.17259233690024162,
+    "reps": 10000,
+    "seed": 2026,
+    "total": 5794
+  },
+  "comparison": "residual",
+  "mcnemar": {
+    "degraded": 140,
+    "discordant": 290,
+    "p_value": 0.5972300763616436,
+    "recovered": 150,
+    "total": 5794
+  },
+  "reference": "linear",
+  "run_id": "20260715T053257.143885Z-full-dd09ff67b6",
+  "source_predictions_sha256": "4dcfc6a6afcf2da9d21b96d9c3b71e3b908f4d70086716aacf78d938c83030d8",
+  "transitions": {
+    "both_correct": 4897,
+    "both_wrong": 607,
+    "linear_correct_residual_wrong": 140,
+    "linear_wrong_residual_correct": 150
+  }
+}

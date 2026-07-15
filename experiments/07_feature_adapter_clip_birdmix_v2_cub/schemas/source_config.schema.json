@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ttvr.local/schemas/birdmix-v2-source-config.schema.json",
+  "title": "BirdMix-v2 source configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "validation_taxon_fraction",
+    "duplicate_audit",
+    "sources"
+  ],
+  "properties": {
+    "validation_taxon_fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "duplicate_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_sha256_policy",
+        "perceptual_hash_policy",
+        "perceptual_hamming_threshold"
+      ],
+      "properties": {
+        "exact_sha256_policy": {
+          "const": "drop-later-source"
+        },
+        "perceptual_hash_policy": {
+          "const": "report-only"
+        },
+        "perceptual_hamming_threshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dataset_id",
+              "root",
+              "samples",
+              "taxa",
+              "train_cache"
+            ],
+            "properties": {
+              "enabled": {
+                "const": true
+              },
+              "dataset_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "root": {
+                "type": "string",
+                "minLength": 1
+              },
+              "samples": {
+                "type": "string",
+                "minLength": 1
+              },
+              "taxa": {
+                "type": "string",
+                "minLength": 1
+              },
+              "train_cache": {
+                "type": "string",
+                "minLength": 1
+              },
+              "validation_cache": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "enabled",
+              "dataset_id",
+              "reason"
+            ],
+            "properties": {
+              "enabled": {
+                "const": false
+              },
+              "dataset_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

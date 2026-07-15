@@ -1,8 +1,7 @@
 """Explicit configuration for the CUB FuDD reproduction.
 
-The notebook is intentionally a thin caller of these objects.  Keeping every
-experimental choice in a dataclass makes a run serialisable and avoids hidden
-notebook state.
+Keeping every experimental choice in a dataclass makes a run serialisable and
+avoids hidden process state.
 """
 
 from __future__ import annotations

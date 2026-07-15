@@ -19,6 +19,10 @@
 | 01 | FuDD | OpenAI CLIP ViT-L/14@336px | CUB-200-2011 | **已完整复现** |
 | 02 | FuDD | SigCLIP | CUB-200-2011 | 计划中 |
 | 03 | FuDD | SigCLIP 2 | CUB-200-2011 | 计划中 |
+| 04 | FuDD | EVA02-CLIP-L/14@336 | CUB-200-2011 | **已完整运行：+1.4498 pp** |
+| 05 | 监督残差分类头 | OpenAI CLIP ViT-L/14@336px | CUB-200-2011 | **探索性完成：87.1074%** |
+| 06 | 类别无关特征适配器 | OpenAI CLIP ViT-L/14@336px | BirdMix-v1 → CUB | 预注册实验进行中 |
+| 07 | 类别无关特征适配器 | OpenAI CLIP ViT-L/14@336px | BirdMix-v2（6 源）→ CUB | 数据缓存进行中 |
 
 完整注册表和命名规则见 [`experiments/README.md`](experiments/README.md)。未来可按同一
 格式增加 `crop + model`、`residual head + model` 或其他组合。
@@ -47,27 +51,44 @@ reference 预测全部一致。
 .
 ├── src/ttvr/
 │   ├── data/
-│   │   └── cub.py                 # 共享 CUB 下载、划分和类别校验
+│   │   ├── cub.py                 # 共享 CUB 下载、划分和类别校验
+│   │   ├── bird_manifest.py       # 多鸟类数据集的统一 manifest
+│   │   ├── birdnet.py             # BirdNET 图片与许可锁定
+│   │   ├── inat2021.py            # iNaturalist Mini Aves
+│   │   ├── big_bird.py            # Big Bird bbox crop 数据管线
+│   │   ├── visual_wetlandbirds.py # WetlandBirds 视频 crop 数据管线
+│   │   ├── usgs_aerial_avian.py   # USGS 航拍鸟类 crop
+│   │   └── nm_uas_waterfowl.py    # NM UAS 水鸟 crop
 │   ├── models/
 │   │   ├── base.py                # 模型后端统一接口和特征容器
-│   │   └── clip.py                # OpenAI CLIP 后端
+│   │   ├── cached.py              # 双编码器共享缓存和聚合
+│   │   ├── clip.py                # OpenAI CLIP 后端
+│   │   └── open_clip.py           # 锁定 checkpoint 的 OpenCLIP/EVA 后端
 │   ├── methods/
-│   │   └── fudd/
+│   │   ├── fudd/
 │   │       ├── config.py          # FuDD 组合配置
 │   │       ├── prompts.py         # 差异描述与 Top-k 候选提示
 │   │       └── evaluation.py      # 模型无关的 FuDD 重排
+│   │   ├── residual_head/         # CUB 监督线性/残差分类头
+│   │   └── feature_adapter/       # 跨数据集类别无关残差适配器
 │   └── metrics.py                 # 共享准确率、排序和转移指标
 │
 ├── scripts/
-│   └── fudd/
-│       ├── run_clip_cub.py        # FuDD + CLIP + CUB 正式入口
-│       └── build_clip_cub_notebook.py
+│   ├── fudd/
+│       ├── run_clip_cub.py        # FuDD + OpenAI CLIP + CUB
+│       └── run_eva02_clip_cub.py  # FuDD + EVA02-CLIP + CUB
+│   ├── residual_head/             # 实验 05 的缓存和训练入口
+│   └── feature_adapter/           # 鸟类数据准备、分片缓存和研究入口
 │
 ├── experiments/
 │   ├── README.md                  # 方法+模型+数据集注册表
 │   ├── 01_fudd_clip_cub/          # 已完成
 │   ├── 02_fudd_sigclip_cub/       # 计划中
 │   ├── 03_fudd_sigclip2_cub/      # 计划中
+│   ├── 04_fudd_eva02_clip_cub/    # 已完成：FuDD +1.4498 pp
+│   ├── 05_residual_head_clip_cub/ # 探索性监督基线
+│   ├── 06_feature_adapter_clip_multi_bird/ # BirdMix-v1
+│   ├── 07_feature_adapter_clip_birdmix_v2_cub/ # 六源 BirdMix-v2
 │   └── _template/                 # 新组合模板
 │
 ├── tests/
@@ -77,8 +98,6 @@ reference 预测全部一致。
 │   └── test_metrics.py
 │
 ├── data/fudd_official/            # 上游来源与哈希；JSON 在运行时下载
-├── notebooks/fudd/                # 可选界面，不维护另一份算法
-├── docs/
 ├── pyproject.toml
 └── README.md
 ```
@@ -99,10 +118,14 @@ reference 预测全部一致。
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install --upgrade pip "setuptools>=69,<81" wheel
+python -m pip install --no-build-isolation -e ".[openai-clip,dev]"
 python -m pytest -q
 ```
+
+OpenAI CLIP 固定在上游提交 `a1d071733d7111c9c014f024669f959182114e33`。该旧包的
+构建脚本仍依赖 `pkg_resources`，因此这里把构建工具锁在兼容区间，并关闭该依赖的
+隔离构建。`openai-clip` 是独立 extra，不会被 EVA02 或其他模型实验自动安装。
 
 先运行 smoke，再运行全部 5,794 张：
 
@@ -111,17 +134,37 @@ python scripts/fudd/run_clip_cub.py --max-samples 32
 python scripts/fudd/run_clip_cub.py
 ```
 
-正式 CLI 每次创建新的 UTC 时间戳与源码摘要 run 目录，不覆盖旧结果。长时间 GPU
-任务建议通过 `tmux` 运行。远程 Colab 连接和结果回传流程见
-[`docs/REMOTE_GPU_CONNECTION.md`](docs/REMOTE_GPU_CONNECTION.md)。
+正式 CLI 每次创建新的 UTC 时间戳与源码摘要 run 目录，不覆盖旧结果。
+CLI 是本项目唯一的实验入口，算法实现位于 `src/ttvr/`。
 
-可选 Notebook 由同一份源码生成：
+## 运行 FuDD + EVA02-CLIP
+
+EVA02 实验使用同一份 FuDD 方法代码，但采用独立模型后端、缓存和 run 目录：
 
 ```bash
-python scripts/fudd/build_clip_cub_notebook.py
+python -m pip install -e ".[eva02,dev]"
+python scripts/fudd/run_eva02_clip_cub.py --max-samples 32
+python scripts/fudd/run_eva02_clip_cub.py
 ```
 
-Notebook 只是界面；正式算法仍位于 `src/ttvr/`。
+模型、HF revision、safetensors SHA-256、tokenizer、336px 预处理及 FP16/FP32
+边界均已锁定。完整 5,794 张实验的 baseline 为 69.9344%，FuDD 为 71.3842%，
+提升 +1.4498 个百分点。协议、统计检验和逐图产物见
+[`experiments/04_fudd_eva02_clip_cub/README.md`](experiments/04_fudd_eva02_clip_cub/README.md)。
+
+## 跨鸟类数据集训练
+
+实验 07 不用 CUB 训练残差分类器，而是在六个外部鸟类来源上训练同一个
+`768 -> 128 -> 768` 类别无关特征适配器，再一次性测试未见过的 CUB 物种。
+当前来源为 iNaturalist Mini Aves、BirdNET、Big Bird、Visual WetlandBirds、
+USGS aerial avian 和 NM UAS waterfowl。所有来源先统一到锁定的 BirdNET/AviList
+物种标识；与 CUB 重合的物种、训练文本及跨源精确重复图像都会在训练任务构造时
+排除。
+
+图像特征按 2,048 行原子分片并保存到 Google Drive。Colab 被回收后会核验并复用
+已经完成的分片，而不是重新计算整个数据集。完整协议、Drive 路径和三 seed
+运行入口见
+[`experiments/07_feature_adapter_clip_birdmix_v2_cub/README.md`](experiments/07_feature_adapter_clip_birdmix_v2_cub/README.md)。
 
 ## Python API
 

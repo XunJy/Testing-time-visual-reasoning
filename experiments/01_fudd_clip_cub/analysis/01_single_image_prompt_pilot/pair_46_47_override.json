@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "created_by": "Codex",
+    "design": "label-aware, post-hoc, age-robust visual differential descriptions",
+    "sources": [
+      "https://www.allaboutbirds.org/guide/American_Goldfinch/id/",
+      "https://www.allaboutbirds.org/guide/European_Goldfinch/id/",
+      "https://www.bto.org/learn/about-birds/birdfacts/goldfinch",
+      "https://www.rspb.org.uk/birds-and-wildlife/goldfinch"
+    ]
+  },
+  "pairs": {
+    "46_47": {
+      "classes": [46, 47],
+      "prompt_pairs": [
+        {
+          "attr_type": "wing marking geometry",
+          "prompt_pair": [
+            "a photograph of an american goldfinch, a type of bird, with blackish wings crossed by two separate pale buff wing bars.",
+            "a photograph of a european goldfinch, a type of bird, with black wings crossed by one broad vivid yellow wing patch."
+          ]
+        },
+        {
+          "attr_type": "juvenile head and body pattern",
+          "prompt_pair": [
+            "a photograph of an american goldfinch, a type of bird, with a juvenile brown back, pale yellow belly, and smooth unstreaked body plumage.",
+            "a photograph of a european goldfinch, a type of bird, with a juvenile plain brownish-gray head and fine brown streaks across the breast and upperparts."
+          ]
+        },
+        {
+          "attr_type": "bill proportions",
+          "prompt_pair": [
+            "a photograph of an american goldfinch, a type of bird, with a short stout conical bill.",
+            "a photograph of a european goldfinch, a type of bird, with a long slender sharply pointed pink bill."
+          ]
+        },
+        {
+          "attr_type": "tail shape and markings",
+          "prompt_pair": [
+            "a photograph of an american goldfinch, a type of bird, with a short notched tail.",
+            "a photograph of a european goldfinch, a type of bird, with a strongly notched black tail bearing small white spots near the tip."
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "bootstrap": {
+    "algorithm": "paired-nonparametric-percentile-bootstrap-top1-accuracy-gain",
+    "baseline_accuracy_percent": 69.93441491197791,
+    "chunk_size": 256,
+    "ci_lower_pp": 0.742147048671039,
+    "ci_upper_pp": 2.15740421125302,
+    "comparison_accuracy_percent": 71.38419054193994,
+    "confidence_level": 0.95,
+    "gain_pp": 1.4497756299620297,
+    "reps": 10000,
+    "seed": 2026,
+    "total": 5794
+  },
+  "comparison": {
+    "baseline_field": "baseline_top1_correct",
+    "comparison_field": "fudd_top1_correct",
+    "unit": "percentage_points"
+  },
+  "input": {
+    "prediction_file": "predictions.jsonl",
+    "prediction_sha256": "b3754d29688dda6b57d68731eb0832b65a4f9cebbbb3c3c94cb86d982e517cb1",
+    "rows": 5794,
+    "sample_index_max": 5793,
+    "sample_index_min": 0,
+    "sample_index_unique": true
+  },
+  "mcnemar": {
+    "algorithm": "exact-two-sided-binomial-mcnemar",
+    "degraded": 173,
+    "discordant": 430,
+    "p_value": 5.959043353515875e-05,
+    "recovered": 257,
+    "total": 5794
+  },
+  "run_id": "20260715T024435.574646Z-full-752dd8120b",
+  "runtime": {
+    "torch_version": "2.11.0+cu128"
+  },
+  "schema_version": 1
+}

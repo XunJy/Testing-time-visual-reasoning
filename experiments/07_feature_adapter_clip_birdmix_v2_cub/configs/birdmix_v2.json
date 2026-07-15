@@ -1,0 +1,55 @@
+{
+  "validation_taxon_fraction": 0.1,
+  "duplicate_audit": {
+    "exact_sha256_policy": "drop-later-source",
+    "perceptual_hash_policy": "report-only",
+    "perceptual_hamming_threshold": 4
+  },
+  "sources": [
+    {
+      "dataset_id": "inaturalist-2021-mini-aves",
+      "root": "data/inat2021",
+      "samples": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/inaturalist-2021-mini-aves/samples.jsonl",
+      "taxa": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/inaturalist-2021-mini-aves/taxa.jsonl",
+      "train_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/inaturalist-2021-mini-aves-train-*.pt",
+      "validation_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/inaturalist-2021-mini-aves-validation-*.pt"
+    },
+    {
+      "dataset_id": "birdnet-taxonomy-v0.3-jul2026",
+      "root": "data/birdnet_taxonomy_v0.3_jul2026",
+      "samples": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/birdnet-taxonomy-v0.3-jul2026/samples.jsonl",
+      "taxa": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/birdnet-taxonomy-v0.3-jul2026/taxa.jsonl",
+      "train_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/birdnet-taxonomy-v0.3-jul2026-train-*.pt"
+    },
+    {
+      "dataset_id": "big-bird-v2026.03.21-bbox-crops",
+      "root": "data/big_bird",
+      "samples": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/big-bird-v2026.03.21-bbox-crops/samples.jsonl",
+      "taxa": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/big-bird-v2026.03.21-bbox-crops/taxa.jsonl",
+      "train_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/big-bird-v2026.03.21-bbox-crops-train-*.pt"
+    },
+    {
+      "dataset_id": "visual-wetlandbirds-v4-stride10-crops",
+      "root": "data/visual_wetlandbirds",
+      "samples": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/visual-wetlandbirds-v4-stride10-crops/samples.jsonl",
+      "taxa": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/visual-wetlandbirds-v4-stride10-crops/taxa.jsonl",
+      "train_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/visual-wetlandbirds-v4-stride10-crops-train-*.pt",
+      "validation_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/visual-wetlandbirds-v4-stride10-crops-validation-*.pt"
+    },
+    {
+      "dataset_id": "usgs-aerial-avian-2023-publisher-crops",
+      "root": "data/usgs_aerial_avian",
+      "samples": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/usgs-aerial-avian-2023-publisher-crops/samples.jsonl",
+      "taxa": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/usgs-aerial-avian-2023-publisher-crops/taxa.jsonl",
+      "train_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/usgs-aerial-avian-2023-publisher-crops-train-*.pt",
+      "validation_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/usgs-aerial-avian-2023-publisher-crops-validation-*.pt"
+    },
+    {
+      "dataset_id": "nm-uas-waterfowl-expert-consensus-v1",
+      "root": "data/nm_uas_waterfowl",
+      "samples": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/nm-uas-waterfowl-expert-consensus-v1/samples.jsonl",
+      "taxa": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/nm-uas-waterfowl-expert-consensus-v1/taxa.jsonl",
+      "train_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/image_features/nm-uas-waterfowl-expert-consensus-v1-train-*.pt"
+    }
+  ]
+}

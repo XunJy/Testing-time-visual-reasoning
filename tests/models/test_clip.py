@@ -3,10 +3,11 @@ from __future__ import annotations
 import sys
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn.functional as functional
 
-from ttvr.methods.fudd.evaluation import _batched_fudd_predictions
+from ttvr.methods.fudd.evaluation import _batched_fudd_predictions, rerank_candidates
 from ttvr.methods.fudd.prompts import CubPromptRepository
 from ttvr.metrics import ordered_predictions
 from ttvr.models import CLIPBackend, TextFeatureTable
@@ -119,6 +120,14 @@ def test_batched_fudd_matches_per_image_reference_with_reordered_candidates(
         batch_size=2,
         progress=None,
     )
+    result = rerank_candidates(
+        image_features,
+        candidates,
+        tiny_prompt_repository,
+        backend,
+        text_table=table,
+        batch_size=1,
+    )
 
     expected_rows = []
     for image, candidate_row in zip(image_features, candidate_rows, strict=True):
@@ -130,3 +139,21 @@ def test_batched_fudd_matches_per_image_reference_with_reordered_candidates(
         expected_rows.append(ordered_predictions(logits, torch.tensor(candidate_row)))
 
     assert torch.equal(actual, torch.stack(expected_rows))
+    assert torch.equal(result.ranked_class_ids, actual)
+    assert torch.equal(result.candidate_class_ids, candidates)
+    assert result.scores.shape == candidates.shape
+
+
+def test_rerank_candidates_rejects_duplicate_candidates(
+    tiny_prompt_repository: CubPromptRepository,
+) -> None:
+    backend = object.__new__(CLIPBackend)
+    backend.device = torch.device("cpu")
+
+    with pytest.raises(ValueError, match="unique"):
+        rerank_candidates(
+            torch.tensor([[1.0, 0.0]]),
+            torch.tensor([[0, 0, 1]]),
+            tiny_prompt_repository,
+            backend,
+        )

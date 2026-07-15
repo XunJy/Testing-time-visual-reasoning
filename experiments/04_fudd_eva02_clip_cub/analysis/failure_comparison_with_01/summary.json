@@ -1,0 +1,369 @@
+{
+  "class_names_sha256": "01eff4094773d49b92210f56efb9cab13860c0cdaf9953ff1e0ef082cf226723",
+  "cross_model": {
+    "all_four_wrong": 1090,
+    "both_models_baseline_wrong": 1363,
+    "both_models_fudd_wrong": 1283,
+    "category_transition_matrix": {
+      "both_correct": {
+        "both_correct": 3061,
+        "both_wrong": 215,
+        "degraded": 48,
+        "recovered": 81
+      },
+      "both_wrong": {
+        "both_correct": 436,
+        "both_wrong": 1090,
+        "degraded": 85,
+        "recovered": 108
+      },
+      "degraded": {
+        "both_correct": 153,
+        "both_wrong": 78,
+        "degraded": 30,
+        "recovered": 5
+      },
+      "recovered": {
+        "both_correct": 229,
+        "both_wrong": 102,
+        "degraded": 10,
+        "recovered": 63
+      }
+    },
+    "same_category_overlap": {
+      "both_correct": {
+        "first_only": 344,
+        "intersection": 3061,
+        "jaccard_percent": 72.48401610229695,
+        "second_only": 818,
+        "union": 4223
+      },
+      "both_wrong": {
+        "first_only": 629,
+        "intersection": 1090,
+        "jaccard_percent": 51.561021759697255,
+        "second_only": 395,
+        "union": 2114
+      },
+      "degraded": {
+        "first_only": 236,
+        "intersection": 30,
+        "jaccard_percent": 7.334963325183374,
+        "second_only": 143,
+        "union": 409
+      },
+      "recovered": {
+        "first_only": 341,
+        "intersection": 63,
+        "jaccard_percent": 10.535117056856187,
+        "second_only": 194,
+        "union": 598
+      }
+    }
+  },
+  "labels": [
+    "openai_clip",
+    "eva02_clip"
+  ],
+  "runs": {
+    "eva02_clip": {
+      "both_wrong_details": {
+        "same_wrong_top1": 1293,
+        "target_in_baseline_top10": 1348,
+        "target_outside_baseline_top10": 137,
+        "top1_changed_by_fudd": 192
+      },
+      "counts": {
+        "both_correct": 3879,
+        "both_wrong": 1485,
+        "degraded": 173,
+        "recovered": 257
+      },
+      "degraded_percent_of_all": 2.9858474283741803,
+      "degraded_percent_of_baseline_correct": 4.269496544916091,
+      "percentages": {
+        "both_correct": 66.94856748360372,
+        "both_wrong": 25.62996202968588,
+        "degraded": 2.9858474283741803,
+        "recovered": 4.43562305833621
+      },
+      "predictions_sha256": "b3754d29688dda6b57d68731eb0832b65a4f9cebbbb3c3c94cb86d982e517cb1",
+      "run_dir": "/Users/xunj/Desktop/Testing-Time Visual Reasoning/experiments/04_fudd_eva02_clip_cub/runs/20260715T024435.574646Z-full-752dd8120b",
+      "top_both_wrong_target_classes": [
+        {
+          "class_id": 102,
+          "class_name": "Sayornis",
+          "count": 30
+        },
+        {
+          "class_id": 125,
+          "class_name": "Nelson-Sharp-tailed Sparrow",
+          "count": 30
+        },
+        {
+          "class_id": 192,
+          "class_name": "Bewick Wren",
+          "count": 30
+        },
+        {
+          "class_id": 60,
+          "class_name": "Heermann Gull",
+          "count": 29
+        },
+        {
+          "class_id": 152,
+          "class_name": "Philadelphia Vireo",
+          "count": 29
+        },
+        {
+          "class_id": 42,
+          "class_name": "Yellow-bellied Flycatcher",
+          "count": 28
+        },
+        {
+          "class_id": 114,
+          "class_name": "Brewer Sparrow",
+          "count": 28
+        },
+        {
+          "class_id": 155,
+          "class_name": "White-eyed Vireo",
+          "count": 28
+        },
+        {
+          "class_id": 25,
+          "class_name": "Bronzed Cowbird",
+          "count": 27
+        },
+        {
+          "class_id": 39,
+          "class_name": "Olive-sided Flycatcher",
+          "count": 27
+        },
+        {
+          "class_id": 65,
+          "class_name": "Western Gull",
+          "count": 27
+        },
+        {
+          "class_id": 160,
+          "class_name": "Blue-winged Warbler",
+          "count": 27
+        }
+      ],
+      "top_degraded_target_classes": [
+        {
+          "class_id": 53,
+          "class_name": "Blue Grosbeak",
+          "count": 10
+        },
+        {
+          "class_id": 37,
+          "class_name": "Great-Crested Flycatcher",
+          "count": 8
+        },
+        {
+          "class_id": 64,
+          "class_name": "Slaty-backed Gull",
+          "count": 7
+        },
+        {
+          "class_id": 124,
+          "class_name": "Lincoln Sparrow",
+          "count": 7
+        },
+        {
+          "class_id": 126,
+          "class_name": "Savannah Sparrow",
+          "count": 7
+        },
+        {
+          "class_id": 29,
+          "class_name": "Fish Crow",
+          "count": 6
+        },
+        {
+          "class_id": 59,
+          "class_name": "Glaucous-winged Gull",
+          "count": 6
+        },
+        {
+          "class_id": 151,
+          "class_name": "Blue-headed Vireo",
+          "count": 6
+        },
+        {
+          "class_id": 172,
+          "class_name": "Orange-crowned Warbler",
+          "count": 6
+        },
+        {
+          "class_id": 26,
+          "class_name": "Shiny Cowbird",
+          "count": 5
+        },
+        {
+          "class_id": 63,
+          "class_name": "Ring-billed Gull",
+          "count": 5
+        },
+        {
+          "class_id": 17,
+          "class_name": "Spotted Catbird",
+          "count": 4
+        }
+      ],
+      "total": 5794
+    },
+    "openai_clip": {
+      "both_wrong_details": {
+        "same_wrong_top1": 1275,
+        "target_in_baseline_top10": 1511,
+        "target_outside_baseline_top10": 208,
+        "top1_changed_by_fudd": 444
+      },
+      "counts": {
+        "both_correct": 3405,
+        "both_wrong": 1719,
+        "degraded": 266,
+        "recovered": 404
+      },
+      "degraded_percent_of_all": 4.590956161546427,
+      "degraded_percent_of_baseline_correct": 7.245982021247617,
+      "percentages": {
+        "both_correct": 58.76769071453227,
+        "both_wrong": 29.668622713151535,
+        "degraded": 4.590956161546427,
+        "recovered": 6.972730410769762
+      },
+      "predictions_sha256": "5ff4b21fd7827cf1aee21642947c662e6567caca79e090d9767ba33e77ce512e",
+      "run_dir": "/Users/xunj/Desktop/Testing-Time Visual Reasoning/experiments/01_fudd_clip_cub/runs/20260714T185902.445729Z-full-3b975c99f4",
+      "top_both_wrong_target_classes": [
+        {
+          "class_id": 65,
+          "class_name": "Western Gull",
+          "count": 30
+        },
+        {
+          "class_id": 102,
+          "class_name": "Sayornis",
+          "count": 30
+        },
+        {
+          "class_id": 109,
+          "class_name": "Geococcyx",
+          "count": 30
+        },
+        {
+          "class_id": 60,
+          "class_name": "Heermann Gull",
+          "count": 29
+        },
+        {
+          "class_id": 114,
+          "class_name": "Brewer Sparrow",
+          "count": 29
+        },
+        {
+          "class_id": 125,
+          "class_name": "Nelson-Sharp-tailed Sparrow",
+          "count": 29
+        },
+        {
+          "class_id": 39,
+          "class_name": "Olive-sided Flycatcher",
+          "count": 28
+        },
+        {
+          "class_id": 124,
+          "class_name": "Lincoln Sparrow",
+          "count": 28
+        },
+        {
+          "class_id": 151,
+          "class_name": "Blue-headed Vireo",
+          "count": 27
+        },
+        {
+          "class_id": 21,
+          "class_name": "Chuck-will Widow",
+          "count": 26
+        },
+        {
+          "class_id": 29,
+          "class_name": "Fish Crow",
+          "count": 26
+        },
+        {
+          "class_id": 122,
+          "class_name": "Henslow Sparrow",
+          "count": 26
+        }
+      ],
+      "top_degraded_target_classes": [
+        {
+          "class_id": 64,
+          "class_name": "Slaty-backed Gull",
+          "count": 10
+        },
+        {
+          "class_id": 152,
+          "class_name": "Philadelphia Vireo",
+          "count": 10
+        },
+        {
+          "class_id": 166,
+          "class_name": "Hooded Warbler",
+          "count": 9
+        },
+        {
+          "class_id": 53,
+          "class_name": "Blue Grosbeak",
+          "count": 8
+        },
+        {
+          "class_id": 107,
+          "class_name": "White-necked Raven",
+          "count": 8
+        },
+        {
+          "class_id": 116,
+          "class_name": "Clay-colored Sparrow",
+          "count": 8
+        },
+        {
+          "class_id": 0,
+          "class_name": "Black-footed Albatross",
+          "count": 7
+        },
+        {
+          "class_id": 52,
+          "class_name": "Western Grebe",
+          "count": 7
+        },
+        {
+          "class_id": 63,
+          "class_name": "Ring-billed Gull",
+          "count": 7
+        },
+        {
+          "class_id": 67,
+          "class_name": "Ruby-throated Hummingbird",
+          "count": 7
+        },
+        {
+          "class_id": 77,
+          "class_name": "Gray Kingbird",
+          "count": 7
+        },
+        {
+          "class_id": 143,
+          "class_name": "Common Tern",
+          "count": 7
+        }
+      ],
+      "total": 5794
+    }
+  },
+  "schema_version": 1
+}

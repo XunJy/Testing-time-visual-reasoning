@@ -18,9 +18,15 @@ or mutate anything under `Old Patch/`.
 Install the project once, then run an integration smoke test:
 
 ```bash
-python -m pip install -e ".[dev,notebook]"
+python -m pip install --upgrade pip "setuptools>=69,<81" wheel
+python -m pip install --no-build-isolation -e ".[openai-clip,dev]"
 python scripts/fudd/run_clip_cub.py --max-samples 32
 ```
+
+The OpenAI CLIP extra is pinned to upstream commit
+`a1d071733d7111c9c014f024669f959182114e33`. Its legacy build imports
+`pkg_resources`, so the compatible setuptools range and `--no-build-isolation`
+are intentional reproducibility constraints.
 
 Only after the smoke run passes, evaluate the complete test split:
 

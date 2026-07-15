@@ -1,0 +1,149 @@
+{
+  "checks": {
+    "exact_checkpoint_verified": true,
+    "fp32_features_and_pooling": true,
+    "local_batched_reference_parity": true,
+    "locked_fp16_forward": true,
+    "locked_model_name": true,
+    "official_fudd_assets": true,
+    "official_fudd_top_k_10": true,
+    "prediction_count_matches": true,
+    "smoke_sample_count": true
+  },
+  "completed_at_utc": "2026-07-15T02:43:59.547856+00:00",
+  "created_at_utc": "2026-07-15T02:42:33.655004+00:00",
+  "environment": {
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_matmul_allow_tf32": false,
+    "cuda_runtime": "12.8",
+    "cudnn": 91900,
+    "cudnn_allow_tf32": true,
+    "gpu": "Tesla T4",
+    "gpu_memory_bytes": 15637086208,
+    "huggingface_hub": "1.20.1",
+    "open_clip_torch": "3.3.0",
+    "pillow": "11.3.0",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.35",
+    "python": "3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]",
+    "safetensors": "0.8.0",
+    "timm": "1.0.28",
+    "torch": "2.11.0+cu128",
+    "torchvision": "0.26.0+cu128"
+  },
+  "evaluation": {
+    "baseline": {
+      "top1": 53.125,
+      "top1_correct": 17,
+      "top5": 100.0,
+      "top5_correct": 32,
+      "total": 32
+    },
+    "config": {
+      "batch_size": 16,
+      "cache_dir": "/home/codex/project/.cache/fudd_eva02_clip_cub",
+      "data_root": "/home/codex/project/data",
+      "device": "cuda",
+      "model_name": "EVA02-L-14-336",
+      "num_workers": 2,
+      "precision": "fp16",
+      "prompt_root": "/home/codex/project/data/fudd_official",
+      "seed": 2026,
+      "text_batch_size": 256,
+      "top_k": 10
+    },
+    "dataset_fingerprint": "865ce63ecd9bf72d14ce683b141e3e9647d78bf4ac6a2d24f5bb7aaf1180c3bf",
+    "feature_dtype": "torch.float32",
+    "fudd": {
+      "candidate_hits": 32,
+      "candidate_recall": 100.0,
+      "top1": 53.125,
+      "top1_correct": 17,
+      "top5": 100.0,
+      "top5_correct": 32,
+      "total": 32
+    },
+    "num_samples": 32,
+    "parity": {
+      "matching_predictions": 32,
+      "max_abs_prototype_difference": 4.470348358154297e-08,
+      "passed": true,
+      "samples": 32
+    },
+    "prediction_count": 32,
+    "prompt_digest": "f01f0c52b328e14b2eb535c888269247bf72f7e0c0c80c286a1d4d50e3870b0c",
+    "transfers": {
+      "both_correct": 16,
+      "both_correct_percent": 50.0,
+      "both_wrong": 14,
+      "both_wrong_percent": 43.75,
+      "degraded": 1,
+      "degraded_percent": 3.125,
+      "recovered": 1,
+      "recovered_percent": 3.125,
+      "total": 32
+    }
+  },
+  "experiment_id": "04_fudd_eva02_clip_cub",
+  "predictions": {
+    "path": "predictions.jsonl",
+    "rows": 32,
+    "sha256": "27827ca94617779d155b67c1364bb66efb4ca836f74c13dda28c674305aae598"
+  },
+  "run_id": "20260715T024233.655004Z-smoke32-752dd8120b",
+  "run_kind": "smoke32",
+  "schema_version": 1,
+  "scientific_comparison": {
+    "baseline_top1_percent": 53.125,
+    "degraded_images": 1,
+    "fudd_top1_percent": 53.125,
+    "gain_pp": 0.0,
+    "net_correct_images": 0,
+    "note": "Descriptive paired outcome only. Integrity PASS is independent of gain sign; uncertainty and significance should be computed from predictions.jsonl.",
+    "question": "Does paper-described FuDD improve this EVA02-CLIP baseline on CUB?",
+    "recovered_images": 1
+  },
+  "source": {
+    "checkpoint_cache_path": "/home/codex/project/.cache/fudd_eva02_clip_cub/models/models--timm--eva02_large_patch14_clip_336.merged2b_s6b_b61k/snapshots/4f62907359c8506be7021582f360564693b22c15/open_clip_model.safetensors",
+    "model": {
+      "cache_identity_sha256": "4572b23eac95d206090770b26bb64fc05c5b1d301ff100c18fad2b2e2c4a75a6",
+      "checkpoint": {
+        "checkpoint_bytes": 856239456,
+        "checkpoint_filename": "open_clip_model.safetensors",
+        "checkpoint_sha256": "f753bca0e8327f77e8845b0af2510d599c3e4614237007b48078c791f2cf391c",
+        "context_length": 77,
+        "crop_mode": "center",
+        "hf_repo_id": "timm/eva02_large_patch14_clip_336.merged2b_s6b_b61k",
+        "hf_revision": "4f62907359c8506be7021582f360564693b22c15",
+        "image_mean": [
+          0.48145466,
+          0.4578275,
+          0.40821073
+        ],
+        "image_size": 336,
+        "image_std": [
+          0.26862954,
+          0.26130258,
+          0.27577711
+        ],
+        "interpolation": "bicubic",
+        "model_name": "EVA02-L-14-336",
+        "pretrained_tag": "merged2b_s6b_b61k",
+        "resize_mode": "shortest",
+        "tokenizer": "open_clip.SimpleTokenizer/openai-bpe"
+      },
+      "checkpoint_verification": {
+        "actual_bytes": 856239456,
+        "actual_sha256": "f753bca0e8327f77e8845b0af2510d599c3e4614237007b48078c791f2cf391c",
+        "status": "verified"
+      },
+      "feature_dtype": "torch.float32",
+      "model_forward_dtype": "torch.float16",
+      "open_clip_torch_required": "3.3.0",
+      "timm_required": "1.0.28"
+    },
+    "official_fudd_commit": "32264231fec047eb0bbbf59bfdbc8e6d208a096b",
+    "project_source_sha256": "752dd8120b6caf4d38e7051921a38b1f467daa50268aced058d037798181b629"
+  },
+  "status": "SMOKE32_PASS"
+}

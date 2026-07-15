@@ -1,0 +1,20 @@
+{
+  "validation_taxon_fraction": 0.1,
+  "sources": [
+    {
+      "dataset_id": "birdnet-taxonomy-v0.3-jul2026",
+      "root": "data/birdnet_taxonomy_v0.3_jul2026",
+      "samples": "data/birdnet_taxonomy_v0.3_jul2026/manifests/samples.jsonl",
+      "taxa": "data/birdnet_taxonomy_v0.3_jul2026/manifests/taxa.jsonl",
+      "train_cache": ".cache/feature_adapter_clip_multi_bird/image_features/birdnet-taxonomy-v0.3-jul2026-train-*.pt"
+    },
+    {
+      "dataset_id": "inaturalist-2021-mini-aves",
+      "root": "data/inat2021",
+      "samples": "data/inat2021/manifests/samples.jsonl",
+      "taxa": "data/inat2021/manifests/taxa.jsonl",
+      "train_cache": ".cache/feature_adapter_clip_multi_bird/image_features/inaturalist-2021-mini-aves-train-*.pt",
+      "validation_cache": ".cache/feature_adapter_clip_multi_bird/image_features/inaturalist-2021-mini-aves-validation-*.pt"
+    }
+  ]
+}

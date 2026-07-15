@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import torch
 from torch import Tensor
+
+EXACT_MCNEMAR_ALGORITHM = "exact-two-sided-binomial-mcnemar"
+PAIRED_BOOTSTRAP_ALGORITHM = "paired-nonparametric-percentile-bootstrap-top1-accuracy-gain"
 
 
 def _as_batched(values: Tensor, *, name: str) -> tuple[Tensor, bool]:
@@ -211,4 +215,179 @@ def compute_transfer_counts(
         recovered=int(recovered.sum().item()),
         degraded=int(degraded.sum().item()),
         both_wrong=int(both_wrong.sum().item()),
+    )
+
+
+def _paired_correctness(
+    baseline_correct: Tensor,
+    comparison_correct: Tensor,
+) -> tuple[Tensor, Tensor]:
+    """Validate and copy paired Top-1 correctness vectors to CPU."""
+
+    for values, name in (
+        (baseline_correct, "baseline_correct"),
+        (comparison_correct, "comparison_correct"),
+    ):
+        if values.ndim != 1 or values.numel() == 0:
+            raise ValueError(f"{name} must be a non-empty one-dimensional tensor")
+        if values.dtype is not torch.bool:
+            raise ValueError(f"{name} must have boolean dtype")
+    if baseline_correct.shape != comparison_correct.shape:
+        raise ValueError("Paired correctness tensors must have the same shape")
+    return (
+        baseline_correct.detach().to(device="cpu").contiguous(),
+        comparison_correct.detach().to(device="cpu").contiguous(),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ExactMcNemarResult:
+    """Exact two-sided McNemar result for paired Top-1 correctness."""
+
+    total: int
+    recovered: int
+    degraded: int
+    p_value: float
+
+    @property
+    def discordant(self) -> int:
+        return self.recovered + self.degraded
+
+    def to_dict(self) -> dict[str, int | float | str]:
+        return {
+            "algorithm": EXACT_MCNEMAR_ALGORITHM,
+            "total": self.total,
+            "recovered": self.recovered,
+            "degraded": self.degraded,
+            "discordant": self.discordant,
+            "p_value": self.p_value,
+        }
+
+
+def _exact_two_sided_binomial_p_value(successes: int, failures: int) -> float:
+    trials = successes + failures
+    if trials == 0:
+        return 1.0
+    lower = min(successes, failures)
+    coefficient = 1
+    lower_tail_numerator = 1
+    for k in range(1, lower + 1):
+        coefficient = coefficient * (trials - k + 1) // k
+        lower_tail_numerator += coefficient
+    return min(1.0, (2 * lower_tail_numerator) / (1 << trials))
+
+
+def exact_mcnemar_test(
+    baseline_correct: Tensor,
+    comparison_correct: Tensor,
+) -> ExactMcNemarResult:
+    """Run the exact two-sided McNemar test on paired Top-1 outcomes.
+
+    The null distribution conditions on discordant pairs and treats recovery
+    versus degradation as a fair binomial outcome.  No asymptotic correction
+    or chi-squared approximation is used.
+    """
+
+    baseline, comparison = _paired_correctness(baseline_correct, comparison_correct)
+    recovered = int((~baseline & comparison).sum().item())
+    degraded = int((baseline & ~comparison).sum().item())
+    return ExactMcNemarResult(
+        total=baseline.numel(),
+        recovered=recovered,
+        degraded=degraded,
+        p_value=_exact_two_sided_binomial_p_value(recovered, degraded),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PairedBootstrapGain:
+    """Percentile bootstrap interval for a paired Top-1 accuracy gain."""
+
+    total: int
+    baseline_accuracy_percent: float
+    comparison_accuracy_percent: float
+    gain_pp: float
+    confidence_level: float
+    ci_lower_pp: float
+    ci_upper_pp: float
+    reps: int
+    seed: int
+    chunk_size: int
+
+    def to_dict(self) -> dict[str, int | float | str]:
+        return {
+            "algorithm": PAIRED_BOOTSTRAP_ALGORITHM,
+            "total": self.total,
+            "baseline_accuracy_percent": self.baseline_accuracy_percent,
+            "comparison_accuracy_percent": self.comparison_accuracy_percent,
+            "gain_pp": self.gain_pp,
+            "confidence_level": self.confidence_level,
+            "ci_lower_pp": self.ci_lower_pp,
+            "ci_upper_pp": self.ci_upper_pp,
+            "reps": self.reps,
+            "seed": self.seed,
+            "chunk_size": self.chunk_size,
+        }
+
+
+def paired_bootstrap_accuracy_gain(
+    baseline_correct: Tensor,
+    comparison_correct: Tensor,
+    *,
+    confidence_level: float = 0.95,
+    reps: int = 10_000,
+    seed: int = 2026,
+    chunk_size: int = 256,
+) -> PairedBootstrapGain:
+    """Estimate a paired nonparametric percentile CI for Top-1 gain.
+
+    Samples, rather than the two systems independently, are resampled with
+    replacement.  Work is performed on CPU in bounded chunks so the default
+    10,000 replicates do not allocate a ``[reps, samples]`` tensor at once.
+    """
+
+    if not 0.0 < confidence_level < 1.0 or not math.isfinite(confidence_level):
+        raise ValueError("confidence_level must be finite and strictly between zero and one")
+    if isinstance(reps, bool) or not isinstance(reps, int) or reps <= 0:
+        raise ValueError("reps must be a positive integer")
+    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**63:
+        raise ValueError("seed must be an integer in [0, 2**63)")
+    if isinstance(chunk_size, bool) or not isinstance(chunk_size, int) or chunk_size <= 0:
+        raise ValueError("chunk_size must be a positive integer")
+
+    baseline, comparison = _paired_correctness(baseline_correct, comparison_correct)
+    total = baseline.numel()
+    baseline_count = int(baseline.sum().item())
+    comparison_count = int(comparison.sum().item())
+    differences = comparison.to(torch.float64) - baseline.to(torch.float64)
+    replicate_gains = torch.empty(reps, dtype=torch.float64, device="cpu")
+    generator = torch.Generator(device="cpu")
+    generator.manual_seed(seed)
+    for start in range(0, reps, chunk_size):
+        stop = min(start + chunk_size, reps)
+        indices = torch.randint(
+            total,
+            (stop - start, total),
+            generator=generator,
+            device="cpu",
+        )
+        replicate_gains[start:stop] = differences[indices].mean(dim=1).mul_(100.0)
+
+    alpha = 1.0 - confidence_level
+    quantiles = torch.quantile(
+        replicate_gains,
+        torch.tensor([alpha / 2.0, 1.0 - alpha / 2.0], dtype=torch.float64),
+        interpolation="linear",
+    )
+    return PairedBootstrapGain(
+        total=total,
+        baseline_accuracy_percent=100.0 * baseline_count / total,
+        comparison_accuracy_percent=100.0 * comparison_count / total,
+        gain_pp=100.0 * (comparison_count - baseline_count) / total,
+        confidence_level=confidence_level,
+        ci_lower_pp=float(quantiles[0].item()),
+        ci_upper_pp=float(quantiles[1].item()),
+        reps=reps,
+        seed=seed,
+        chunk_size=chunk_size,
     )

@@ -121,7 +121,7 @@ def _write_checksums(run_dir: Path) -> Path:
 
 
 class ProgressPrinter:
-    """Print bounded progress updates without requiring a notebook UI."""
+    """Print bounded progress updates for CLI runs."""
 
     def __init__(self) -> None:
         self._last: dict[tuple[str, int], int] = {}

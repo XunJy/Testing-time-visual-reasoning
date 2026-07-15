@@ -1,0 +1,58 @@
+{
+  "baseline_top10": [
+    {"class_id": 46, "class_name": "American Goldfinch", "rank": 1},
+    {"class_id": 47, "class_name": "European Goldfinch", "rank": 2},
+    {"class_id": 170, "class_name": "Myrtle Warbler", "rank": 3},
+    {"class_id": 33, "class_name": "Gray-crowned-Rosy Finch", "rank": 4},
+    {"class_id": 165, "class_name": "Golden-winged Warbler", "rank": 5},
+    {"class_id": 180, "class_name": "Worm-eating Warbler", "rank": 6},
+    {"class_id": 54, "class_name": "Evening Grosbeak", "rank": 7},
+    {"class_id": 34, "class_name": "Purple Finch", "rank": 8},
+    {"class_id": 117, "class_name": "House Sparrow", "rank": 9},
+    {"class_id": 127, "class_name": "Seaside Sparrow", "rank": 10}
+  ],
+  "fudd_ranking": [46, 47, 170, 165, 34, 54, 33, 180, 117, 127],
+  "image_id": 2738,
+  "image_sha256": "9c1eff067902239b9c95d29dad667578bda8cfd15329794e30990b3c514ca623",
+  "official_pair_46_47": {
+    "classes": [46, 47],
+    "prompt_pairs": [
+      {
+        "attr_type": "head pattern",
+        "prompt_pair": [
+          "a photograph of an american goldfinch, a type of bird, with a black cap on its head.",
+          "a photograph of a european goldfinch, a type of bird, with a red face mask."
+        ]
+      },
+      {
+        "attr_type": "wing bars",
+        "prompt_pair": [
+          "a photograph of an american goldfinch, a type of bird, with white wing bars.",
+          "a photograph of a european goldfinch, a type of bird, with yellow wing bars."
+        ]
+      },
+      {
+        "attr_type": "body color",
+        "prompt_pair": [
+          "a photograph of an american goldfinch, a type of bird, with bright yellow body color.",
+          "a photograph of a european goldfinch, a type of bird, with muted yellow body color."
+        ]
+      },
+      {
+        "attr_type": "bill shape",
+        "prompt_pair": [
+          "a photograph of an american goldfinch, a type of bird, with a conical bill shape.",
+          "a photograph of a european goldfinch, a type of bird, with a pointed bill shape."
+        ]
+      }
+    ]
+  },
+  "parent_run": {
+    "run_id": "20260714T185902.445729Z-full-3b975c99f4",
+    "predictions_sha256": "5ff4b21fd7827cf1aee21642947c662e6567caca79e090d9767ba33e77ce512e",
+    "result_sha256": "777701151956b66eadb9c5c1323d3c7949307c838784b87cb1d752d6eb5f2831"
+  },
+  "relative_path": "048.European_Goldfinch/European_Goldfinch_0047_33332.jpg",
+  "sample_index": 1314,
+  "target_class_id": 47
+}

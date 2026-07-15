@@ -106,6 +106,31 @@ class PredictionRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateRerankResult:
+    """Candidate-aligned FuDD scores and their globally labelled ranking."""
+
+    candidate_class_ids: Tensor
+    scores: Tensor
+    ranked_class_ids: Tensor
+
+    def __post_init__(self) -> None:
+        if not (
+            self.candidate_class_ids.ndim == 2
+            and self.scores.ndim == 2
+            and self.ranked_class_ids.ndim == 2
+        ):
+            raise ValueError("Candidate rerank tensors must be two-dimensional")
+        if not (
+            self.candidate_class_ids.shape
+            == self.scores.shape
+            == self.ranked_class_ids.shape
+        ):
+            raise ValueError("Candidate rerank tensors must have identical shapes")
+        if self.scores.numel() == 0 or not bool(torch.isfinite(self.scores).all()):
+            raise ValueError("Candidate rerank scores must be non-empty and finite")
+
+
+@dataclass(frozen=True, slots=True)
 class ParityReport:
     """Agreement between the batched implementation and official-style loop."""
 
@@ -312,8 +337,73 @@ def _batched_fudd_predictions(
     batch_size: int,
     progress: ProgressCallback | None,
 ) -> Tensor:
+    """Compatibility wrapper around :func:`rerank_candidates`."""
+
+    del candidate_rows
+    return rerank_candidates(
+        image_features,
+        candidates,
+        prompts,
+        backend,
+        text_table=text_table,
+        batch_size=batch_size,
+        progress=progress,
+    ).ranked_class_ids
+
+
+def rerank_candidates(
+    image_features: Tensor,
+    candidates: Tensor,
+    prompts: CubPromptRepository,
+    backend: VisionLanguageBackend,
+    *,
+    text_table: TextFeatureTable | None = None,
+    batch_size: int = 32,
+    progress: ProgressCallback | None = None,
+) -> CandidateRerankResult:
+    """Rerank per-image candidate classes with FuDD prompt prototypes.
+
+    ``scores`` remains aligned with the input candidate columns.  Rankings use
+    the corresponding global class ids and never introduce a new candidate.
+    When no text table is supplied, the exact required prompt union is encoded
+    once before scoring.
+    """
+
+    if image_features.ndim != 2 or image_features.shape[0] == 0:
+        raise ValueError("image_features must have shape [samples, dimensions]")
+    if candidates.ndim != 2 or candidates.shape[0] == 0:
+        raise ValueError("candidates must have shape [samples, classes]")
+    if image_features.shape[0] != candidates.shape[0]:
+        raise ValueError("image_features and candidates must have the same sample count")
+    if candidates.shape[1] < 2:
+        raise ValueError("FuDD requires at least two candidates per image")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    if candidates.dtype == torch.bool or candidates.dtype.is_floating_point:
+        raise TypeError("candidates must contain integer class ids")
+
+    candidate_ids = candidates.detach().to(device="cpu", dtype=torch.long).contiguous()
+    if bool((candidate_ids < 0).any()) or bool((candidate_ids >= prompts.class_count).any()):
+        raise ValueError("Candidate class id is outside the prompt repository")
+    for row in candidate_ids.tolist():
+        if len(set(row)) != len(row):
+            raise ValueError("Candidate class ids must be unique within each image")
+    candidate_rows = candidate_ids.tolist()
+
+    if text_table is None:
+        required_texts = _required_followup_texts(
+            candidate_rows,
+            prompts,
+            progress=progress,
+        )
+        text_table = backend.build_text_feature_table(
+            required_texts,
+            progress=progress,
+        )
+
     prediction_batches: list[Tensor] = []
-    total, top_k = candidates.shape
+    score_batches: list[Tensor] = []
+    total, top_k = candidate_ids.shape
     with torch.inference_mode():
         for start in range(0, total, batch_size):
             stop = min(start + batch_size, total)
@@ -338,11 +428,16 @@ def _batched_fudd_predictions(
                 class_features,
                 batch_images.unsqueeze(2),
             ).squeeze(2)
-            global_candidates = candidates[start:stop].to(backend.device)
+            global_candidates = candidate_ids[start:stop].to(backend.device)
+            score_batches.append(logits.cpu())
             prediction_batches.append(ordered_predictions(logits, global_candidates).cpu())
             if progress is not None:
                 progress("fudd", stop, total)
-    return torch.cat(prediction_batches, dim=0)
+    return CandidateRerankResult(
+        candidate_class_ids=candidate_ids,
+        scores=torch.cat(score_batches, dim=0),
+        ranked_class_ids=torch.cat(prediction_batches, dim=0),
+    )
 
 
 def _check_official_reference_parity(
@@ -411,21 +506,21 @@ def evaluate_cub(
     parity_samples: int = 8,
     progress: ProgressCallback | None = None,
 ) -> EvaluationReport:
-    """Evaluate the paper's CLIP baseline and FuDD reranking on CUB.
+    """Evaluate a single-template baseline and FuDD reranking on CUB.
 
     The image encoder runs exactly once per sample.  The single-template class
     features are computed once, and all differential prompt features required
     by the selected examples are encoded in large batches and reused.
 
     ``max_samples`` takes a deterministic prefix of the official test split and
-    is intended only for notebook smoke tests.  Leave it as ``None`` for the
-    reproducible full 5,794-image result.
+    is intended only for smoke tests.  Leave it as ``None`` for the reproducible
+    full 5,794-image result.
     """
 
     if dataset.split != "test":
         raise ValueError("FuDD CUB reproduction requires split='test'")
     if dataset.transform is None:
-        raise ValueError("Dataset transform must be CLIPBackend.preprocess")
+        raise ValueError("Dataset transform must be the model backend's preprocess transform")
     if prompts.class_count != 200 or prompts.pair_count != 19_900:
         raise ValueError("The official 200-class, 19,900-pair prompts are required")
     if backend.model_name != config.model_name:
@@ -452,17 +547,21 @@ def evaluate_cub(
     if config.cache_dir is not None:
         precision = _slug(f"{backend.precision}-{backend.feature_dtype_name}")
         model = _slug(config.model_name)
+        identity = hashlib.sha256(backend.cache_identity.encode()).hexdigest()[:16]
         text_cache_path = (
             config.cache_dir
             / "text_features"
-            / f"{model}-{precision}-{prompts.source_digest[:16]}.pt"
+            / f"{model}-{identity}-{precision}-{prompts.source_digest[:16]}.pt"
         )
         backend.configure_text_cache(text_cache_path)
         sample_tag = "all" if effective_samples == len(dataset) else str(effective_samples)
         image_cache_path = (
             config.cache_dir
             / "image_features"
-            / f"cub-test-{model}-{precision}-{dataset_fingerprint[:16]}-{sample_tag}.pt"
+            / (
+                f"cub-test-{model}-{identity}-{precision}-"
+                f"{dataset_fingerprint[:16]}-{sample_tag}.pt"
+            )
         )
 
     image_feature_set = backend.encode_dataset(
@@ -472,7 +571,7 @@ def evaluate_cub(
         max_samples=max_samples,
         seed=config.seed,
         cache_path=image_cache_path,
-        cache_tag=(f"cub:test:{dataset_fingerprint}:{effective_samples}:{config.model_name}"),
+        cache_tag=(f"cub:test:{dataset_fingerprint}:{effective_samples}:{backend.cache_identity}"),
         progress=progress,
     )
 
@@ -581,11 +680,7 @@ def run_clip_cub_experiment(
     verify_images: bool = True,
     progress: ProgressCallback | None = None,
 ) -> EvaluationReport:
-    """Convenience pipeline for non-notebook callers.
-
-    The notebook may call the same preparation steps individually when showing
-    intermediate state is helpful; both paths eventually use ``evaluate_cub``.
-    """
+    """Run the complete CLIP + FuDD preparation and evaluation pipeline."""
 
     if download_prompts:
         download_official_prompts(config.prompt_root)

@@ -6,7 +6,9 @@ import torch
 from ttvr.metrics import (
     compute_topk_accuracy,
     compute_transfer_counts,
+    exact_mcnemar_test,
     ordered_predictions,
+    paired_bootstrap_accuracy_gain,
     topk_hits,
 )
 
@@ -132,3 +134,69 @@ def test_transfer_counts_accept_top1_vectors() -> None:
     assert counts.recovered == 1
     assert counts.degraded == 1
     assert counts.both_wrong == 0
+
+
+def test_exact_mcnemar_uses_two_sided_binomial_tail() -> None:
+    baseline = torch.tensor([False, False, False, False, True, True], dtype=torch.bool)
+    comparison = torch.tensor([True, True, True, True, False, True], dtype=torch.bool)
+
+    result = exact_mcnemar_test(baseline, comparison)
+
+    assert result.total == 6
+    assert result.recovered == 4
+    assert result.degraded == 1
+    assert result.discordant == 5
+    assert result.p_value == pytest.approx(0.375)
+
+
+def test_exact_mcnemar_returns_one_when_there_are_no_discordant_pairs() -> None:
+    outcomes = torch.tensor([True, False, True], dtype=torch.bool)
+
+    result = exact_mcnemar_test(outcomes, outcomes)
+
+    assert result.discordant == 0
+    assert result.p_value == 1.0
+
+
+def test_paired_bootstrap_is_seed_reproducible_and_reports_gain() -> None:
+    baseline = torch.tensor([True, False, False, True, False], dtype=torch.bool)
+    comparison = torch.tensor([True, True, False, False, True], dtype=torch.bool)
+
+    first = paired_bootstrap_accuracy_gain(
+        baseline,
+        comparison,
+        reps=257,
+        seed=17,
+        chunk_size=31,
+    )
+    second = paired_bootstrap_accuracy_gain(
+        baseline,
+        comparison,
+        reps=257,
+        seed=17,
+        chunk_size=31,
+    )
+
+    assert first == second
+    assert first.baseline_accuracy_percent == 40.0
+    assert first.comparison_accuracy_percent == 60.0
+    assert first.gain_pp == 20.0
+    assert first.ci_lower_pp <= first.gain_pp <= first.ci_upper_pp
+
+
+@pytest.mark.parametrize(
+    ("baseline", "comparison"),
+    [
+        (torch.tensor([], dtype=torch.bool), torch.tensor([], dtype=torch.bool)),
+        (torch.tensor([1]), torch.tensor([1])),
+        (torch.tensor([True]), torch.tensor([True, False])),
+    ],
+)
+def test_paired_statistics_reject_invalid_correctness_vectors(
+    baseline: torch.Tensor,
+    comparison: torch.Tensor,
+) -> None:
+    with pytest.raises(ValueError):
+        exact_mcnemar_test(baseline, comparison)
+    with pytest.raises(ValueError):
+        paired_bootstrap_accuracy_gain(baseline, comparison, reps=2)

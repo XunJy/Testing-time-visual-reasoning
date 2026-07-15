@@ -56,6 +56,7 @@ class VisionLanguageBackend(Protocol):
     """Structural interface required by model-agnostic TT-VR methods."""
 
     model_name: str
+    cache_identity: str
     device: torch.device
     precision: str
     text_batch_size: int
@@ -91,5 +92,6 @@ class VisionLanguageBackend(Protocol):
         seed: int = 0,
         cache_path: Path | str | None = None,
         cache_tag: str = "",
+        cache_shard_size: int | None = None,
         progress: ProgressCallback | None = None,
     ) -> ImageFeatureSet: ...

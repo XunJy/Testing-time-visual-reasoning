@@ -1,0 +1,49 @@
+{
+  "checkpoint": {
+    "checkpoint_bytes": 856239456,
+    "checkpoint_filename": "open_clip_model.safetensors",
+    "checkpoint_sha256": "f753bca0e8327f77e8845b0af2510d599c3e4614237007b48078c791f2cf391c",
+    "context_length": 77,
+    "crop_mode": "center",
+    "hf_repo_id": "timm/eva02_large_patch14_clip_336.merged2b_s6b_b61k",
+    "hf_revision": "4f62907359c8506be7021582f360564693b22c15",
+    "image_mean": [
+      0.48145466,
+      0.4578275,
+      0.40821073
+    ],
+    "image_size": 336,
+    "image_std": [
+      0.26862954,
+      0.26130258,
+      0.27577711
+    ],
+    "interpolation": "bicubic",
+    "model_name": "EVA02-L-14-336",
+    "pretrained_tag": "merged2b_s6b_b61k",
+    "resize_mode": "shortest",
+    "tokenizer": "open_clip.SimpleTokenizer/openai-bpe"
+  },
+  "completed_at_utc": "2026-07-15T02:43:59.547856+00:00",
+  "config": {
+    "batch_size": 16,
+    "cache_dir": "/home/codex/project/.cache/fudd_eva02_clip_cub",
+    "data_root": "/home/codex/project/data",
+    "device": "cuda",
+    "model_name": "EVA02-L-14-336",
+    "num_workers": 2,
+    "precision": "fp16",
+    "prompt_root": "/home/codex/project/data/fudd_official",
+    "seed": 2026,
+    "text_batch_size": 256,
+    "top_k": 10
+  },
+  "created_at_utc": "2026-07-15T02:42:33.655004+00:00",
+  "experiment_id": "04_fudd_eva02_clip_cub",
+  "max_samples": 32,
+  "parity_samples": 32,
+  "result": "result.json",
+  "run_id": "20260715T024233.655004Z-smoke32-752dd8120b",
+  "source_digest": "752dd8120b6caf4d38e7051921a38b1f467daa50268aced058d037798181b629",
+  "status": "SMOKE32_PASS"
+}

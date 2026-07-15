@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ttvr.local/schemas/birdmix-v2-study.schema.json",
+  "title": "BirdMix-v2 study configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "protocol",
+    "study_id",
+    "seeds",
+    "source_configs",
+    "common"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "experiment_id": {
+      "const": "07_feature_adapter_clip_birdmix_v2_cub"
+    },
+    "protocol": {
+      "const": "external-only-strict-cub-birdmix-v2"
+    },
+    "study_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "seeds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "source_configs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trial_id",
+          "path"
+        ],
+        "properties": {
+          "trial_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "common": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cub_data_root",
+        "cub_class_names",
+        "birdnet_csv",
+        "cub_feature_cache",
+        "model_cache_dir",
+        "text_cache",
+        "runs_root",
+        "steps",
+        "validation_interval",
+        "patience_intervals",
+        "batch_size",
+        "learning_rate",
+        "weight_decay",
+        "identity_weight",
+        "hidden_dim",
+        "device"
+      ],
+      "properties": {
+        "cub_data_root": {"type": "string", "minLength": 1},
+        "cub_class_names": {"type": "string", "minLength": 1},
+        "birdnet_csv": {"type": "string", "minLength": 1},
+        "cub_feature_cache": {"type": "string", "minLength": 1},
+        "model_cache_dir": {"type": "string", "minLength": 1},
+        "text_cache": {"type": "string", "minLength": 1},
+        "runs_root": {"type": "string", "minLength": 1},
+        "steps": {"type": "integer", "minimum": 1},
+        "validation_interval": {"type": "integer", "minimum": 1},
+        "patience_intervals": {"type": "integer", "minimum": 1},
+        "batch_size": {"type": "integer", "minimum": 1},
+        "learning_rate": {"type": "number", "exclusiveMinimum": 0},
+        "weight_decay": {"type": "number", "minimum": 0},
+        "identity_weight": {"type": "number", "minimum": 0},
+        "hidden_dim": {"type": "integer", "minimum": 1},
+        "device": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

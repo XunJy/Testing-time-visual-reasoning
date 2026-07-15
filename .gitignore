@@ -21,6 +21,12 @@ Old Patch/
 data/CUB_200_2011/
 data/CUB_200_2011.tgz
 data/CUB_200_2011.tgz.part
+data/birdnet_taxonomy_v0.3_jul2026/
+data/inat2021/
+data/big_bird/
+data/visual_wetlandbirds/
+data/usgs_aerial_avian/
+data/nm_uas_waterfowl/
 # The FuDD repository does not declare a license for these upstream assets.
 # They are downloaded from the pinned author commit and SHA-256 verified.
 data/fudd_official/cub_class_names.json

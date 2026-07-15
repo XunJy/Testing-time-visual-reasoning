@@ -9,23 +9,23 @@ description = "Reproducible method-plus-model experiments for testing-time visua
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "clip @ git+https://github.com/openai/CLIP.git@a1d071733d7111c9c014f024669f959182114e33",
     "pillow>=9.4",
     "torch>=2.2",
     "torchvision>=0.17",
 ]
 
 [project.optional-dependencies]
+openai-clip = [
+    "clip @ git+https://github.com/openai/CLIP.git@a1d071733d7111c9c014f024669f959182114e33",
+]
+eva02 = [
+    "open_clip_torch==3.3.0",
+    "timm==1.0.28",
+]
 dev = [
-    "nbformat>=5.10",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.5",
-]
-notebook = [
-    "jupyterlab>=4.2",
-    "nbformat>=5.10",
-    "numpy>=1.24,<3",
 ]
 
 [project.urls]

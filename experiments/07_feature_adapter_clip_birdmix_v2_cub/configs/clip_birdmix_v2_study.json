@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "experiment_id": "07_feature_adapter_clip_birdmix_v2_cub",
+  "protocol": "external-only-strict-cub-birdmix-v2",
+  "study_id": "clip-birdmix-v2",
+  "seeds": [
+    2026,
+    2027,
+    2028
+  ],
+  "source_configs": [
+    {
+      "trial_id": "all-enabled-sources",
+      "path": "experiments/07_feature_adapter_clip_birdmix_v2_cub/configs/birdmix_v2.json"
+    }
+  ],
+  "common": {
+    "cub_data_root": "data",
+    "cub_class_names": "data/fudd_official/cub_class_names.json",
+    "birdnet_csv": "data/birdnet_taxonomy_v0.3_jul2026/birdnet-taxonomy-v0.3-Jul2026.csv",
+    "cub_feature_cache": ".cache/fudd_clip_cub/image_features/cub-test-ViT-L-14-336px-99be7f15685fe24c-fp32-torch.float32-865ce63ecd9bf72d-all.pt",
+    "model_cache_dir": ".cache/fudd_clip_cub/models",
+    "text_cache": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2/text_features.pt",
+    "runs_root": "/content/drive/MyDrive/Testing-Time-Visual-Reasoning/runs/07_feature_adapter_clip_birdmix_v2_cub",
+    "steps": 20000,
+    "validation_interval": 250,
+    "patience_intervals": 8,
+    "batch_size": 256,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.0001,
+    "identity_weight": 0.1,
+    "hidden_dim": 128,
+    "device": "cuda"
+  }
+}

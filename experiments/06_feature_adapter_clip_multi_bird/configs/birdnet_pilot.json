@@ -1,0 +1,12 @@
+{
+  "validation_taxon_fraction": 0.1,
+  "sources": [
+    {
+      "dataset_id": "birdnet-taxonomy-v0.3-jul2026",
+      "root": "data/birdnet_taxonomy_v0.3_jul2026",
+      "samples": "data/birdnet_taxonomy_v0.3_jul2026/manifests/samples.jsonl",
+      "taxa": "data/birdnet_taxonomy_v0.3_jul2026/manifests/taxa.jsonl",
+      "train_cache": ".cache/feature_adapter_clip_multi_bird/image_features/birdnet-taxonomy-v0.3-jul2026-train-*.pt"
+    }
+  ]
+}

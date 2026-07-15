@@ -1,0 +1,20 @@
+{
+  "completed_at_utc": "2026-07-15T05:34:26.563864+00:00",
+  "created_at_utc": "2026-07-15T05:32:57.143885+00:00",
+  "execution": {
+    "cache_dir": "/home/codex/project/.cache/fudd_clip_cub",
+    "data_root": "/home/codex/project/data",
+    "head_device": "cuda",
+    "image_batch_size": 32,
+    "image_device": "cuda",
+    "num_workers": 2,
+    "prompt_root": "/home/codex/project/data/fudd_official",
+    "runs_root": "/home/codex/project/experiments/05_residual_head_clip_cub/runs",
+    "seed": 2026
+  },
+  "result": "result.json",
+  "run_id": "20260715T053257.143885Z-full-dd09ff67b6",
+  "schema_version": 1,
+  "source_digest": "dd09ff67b6d2b290d77bac6c28a1f0e67fade3c1e2e51f9a5f0b584b5ca9902b",
+  "status": "PASS"
+}

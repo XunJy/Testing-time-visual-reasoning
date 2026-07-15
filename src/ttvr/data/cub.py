@@ -343,8 +343,8 @@ def prepare_cub(
 ) -> CUB200Dataset:
     """Prepare CUB and return an explicit dataset object.
 
-    This is the recommended notebook entry point.  Pass the CLIP preprocessing
-    transform explicitly to keep model and input resolution coupled.
+    Pass the model preprocessing transform explicitly to keep the backend and
+    input resolution coupled.
     """
 
     if download:

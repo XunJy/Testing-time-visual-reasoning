@@ -46,6 +46,11 @@ class DifferentialDescription:
     first: str
     second: str
 
+    def __post_init__(self) -> None:
+        values = (self.attribute, self.first, self.second)
+        if any(not isinstance(value, str) or not value.strip() for value in values):
+            raise ValueError("Differential-description fields must be non-empty strings")
+
 
 @dataclass(frozen=True, slots=True)
 class ClassPairDescriptions:
@@ -54,6 +59,14 @@ class ClassPairDescriptions:
     first_id: int
     second_id: int
     descriptions: tuple[DifferentialDescription, ...]
+
+    def __post_init__(self) -> None:
+        if not (0 <= self.first_id < self.second_id):
+            raise ValueError("Class-pair ids must satisfy 0 <= first_id < second_id")
+        if not self.descriptions:
+            raise ValueError("A class pair requires at least one differential description")
+        if not all(isinstance(item, DifferentialDescription) for item in self.descriptions):
+            raise TypeError("descriptions must contain DifferentialDescription values")
 
     def prompts_for(self, class_id: int) -> tuple[str, ...]:
         """Return raw prompt strings associated with one side of the pair."""
@@ -67,7 +80,7 @@ class ClassPairDescriptions:
 
 @dataclass(frozen=True, slots=True)
 class CubPromptRepository:
-    """Validated, immutable view of the official CUB FuDD prompt assets."""
+    """Validated, immutable view of CUB FuDD prompt assets."""
 
     class_names: tuple[str, ...]
     pairs: Mapping[tuple[int, int], ClassPairDescriptions]
@@ -146,6 +159,73 @@ class CubPromptRepository:
                 texts.setdefault(description.first.capitalize(), None)
                 texts.setdefault(description.second.capitalize(), None)
         return tuple(texts)
+
+    def with_pair_overrides(
+        self,
+        overrides: Mapping[tuple[int, int], ClassPairDescriptions],
+    ) -> CubPromptRepository:
+        """Derive a repository with explicitly replaced class pairs.
+
+        The original repository remains unchanged.  The derived source digest
+        includes both the base digest and a canonical serialization of every
+        replacement, so official and experimental prompt caches cannot be
+        confused.
+        """
+
+        if not isinstance(overrides, Mapping) or not overrides:
+            raise ValueError("At least one pair override is required")
+
+        pairs = dict(self.pairs)
+        canonical: list[dict[str, Any]] = []
+        for key in sorted(overrides):
+            if not (
+                isinstance(key, tuple)
+                and len(key) == 2
+                and all(isinstance(value, int) for value in key)
+            ):
+                raise TypeError("Pair override keys must be (first_id, second_id) tuples")
+            pair = overrides[key]
+            if not isinstance(pair, ClassPairDescriptions):
+                raise TypeError("Pair overrides must contain ClassPairDescriptions values")
+            expected_key = (pair.first_id, pair.second_id)
+            if key != expected_key:
+                raise ValueError(f"Override key {key} does not match pair ids {expected_key}")
+            if key not in pairs:
+                raise ValueError(f"Pair override is not present in the base repository: {key}")
+            if pair.second_id >= self.class_count:
+                raise ValueError(f"Pair override class id is out of range: {key}")
+
+            pairs[key] = pair
+            canonical.append(
+                {
+                    "classes": [pair.first_id, pair.second_id],
+                    "prompt_pairs": [
+                        {
+                            "attr_type": item.attribute,
+                            "prompt_pair": [item.first, item.second],
+                        }
+                        for item in pair.descriptions
+                    ],
+                }
+            )
+
+        digest = hashlib.sha256()
+        digest.update(b"ttvr-fudd-pair-overrides-v1\0")
+        digest.update(self.source_digest.encode())
+        digest.update(b"\0")
+        digest.update(
+            json.dumps(
+                canonical,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        )
+        return CubPromptRepository(
+            class_names=self.class_names,
+            pairs=MappingProxyType(pairs),
+            source_digest=digest.hexdigest(),
+        )
 
     def _validate_class_ids(
         self,
@@ -349,3 +429,27 @@ def load_official_prompts(root: Path | str) -> CubPromptRepository:
         pairs=MappingProxyType(pairs),
         source_digest=combined_digest.hexdigest(),
     )
+
+
+def load_pair_overrides(path: Path | str) -> Mapping[tuple[int, int], ClassPairDescriptions]:
+    """Load a versioned, sparse set of class-pair replacements.
+
+    The ``pairs`` object uses the same per-pair schema as the official FuDD
+    asset, while allowing experiment metadata to live beside it.
+    """
+
+    override_path = Path(path).expanduser()
+    raw = _load_json(override_path)
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        raise RuntimeError("Pair override file must be an object with schema_version=1")
+    raw_pairs = raw.get("pairs")
+    if not isinstance(raw_pairs, dict) or not raw_pairs:
+        raise RuntimeError("Pair override file must contain a non-empty 'pairs' object")
+
+    overrides: dict[tuple[int, int], ClassPairDescriptions] = {}
+    for key, value in raw_pairs.items():
+        pair_key, pair = _parse_pair(key, value)
+        if pair_key in overrides:
+            raise RuntimeError(f"Duplicate pair override: {pair_key}")
+        overrides[pair_key] = pair
+    return MappingProxyType(overrides)
