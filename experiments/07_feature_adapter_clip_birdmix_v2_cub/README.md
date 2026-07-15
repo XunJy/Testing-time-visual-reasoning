@@ -36,7 +36,7 @@ may stay on Colab's ephemeral disk under the project `data/` directories. The
 durable feature-cache root is locked to:
 
 ```text
-/content/drive/MyDrive/Testing-Time-Visual-Reasoning/cache/clip_birdmix_v2
+/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2
 ```
 
 Pass that path as `--cache-dir` to
@@ -44,10 +44,10 @@ Pass that path as `--cache-dir` to
 and assembled final caches are both written there, so an interrupted runtime
 can resume without re-encoding completed shards. Copy each immutable
 `source.json`, `samples.jsonl`, and `taxa.jsonl` to the per-dataset directory
-under `/content/drive/MyDrive/Testing-Time-Visual-Reasoning/manifests/`; the
+under `/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/`; the
 locked source config reads those Drive copies while image roots remain
 ephemeral. Trial outputs go directly to
-`/content/drive/MyDrive/Testing-Time-Visual-Reasoning/runs/07_feature_adapter_clip_birdmix_v2_cub`.
+`/content/drive/MyDrive/Testing-Time Visual Reasoning/runs/07_feature_adapter_clip_birdmix_v2_cub`.
 
 Thus raw media can be discarded with the Colab runtime, while shards, final
 feature caches, manifests, and immutable run artifacts survive on Drive.

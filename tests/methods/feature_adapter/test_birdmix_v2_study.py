@@ -10,6 +10,7 @@ from scripts.feature_adapter import run_clip_birdmix_v2_study as study
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 EXPERIMENT_ROOT = PROJECT_ROOT / "experiments/07_feature_adapter_clip_birdmix_v2_cub"
 STUDY_CONFIG = EXPERIMENT_ROOT / "configs/clip_birdmix_v2_study.json"
+DRIVE_ROOT = "/content/drive/MyDrive/Testing-Time Visual Reasoning"
 
 
 def _option(argv: tuple[str, ...], name: str) -> str:
@@ -51,6 +52,30 @@ def test_v2_source_config_enables_all_six_audited_sources() -> None:
         "nm-uas-waterfowl-expert-consensus-v1",
     ]
     assert disabled == []
+
+
+def test_v2_drive_paths_use_the_existing_space_named_root() -> None:
+    study_value = json.loads(STUDY_CONFIG.read_text(encoding="utf-8"))
+    source_value = json.loads(
+        (EXPERIMENT_ROOT / "configs/birdmix_v2.json").read_text(encoding="utf-8")
+    )
+    drive_paths = [
+        study_value["common"]["text_cache"],
+        study_value["common"]["runs_root"],
+        *(
+            row[key]
+            for row in source_value["sources"]
+            for key in ("samples", "taxa", "train_cache", "validation_cache")
+            if key in row
+        ),
+    ]
+
+    assert drive_paths
+    assert all(path.startswith(f"{DRIVE_ROOT}/") for path in drive_paths)
+    assert not any("Testing-Time-Visual-Reasoning" in path for path in drive_paths)
+    readme = (EXPERIMENT_ROOT / "README.md").read_text(encoding="utf-8")
+    assert DRIVE_ROOT in readme
+    assert "Testing-Time-Visual-Reasoning" not in readme
 
 
 def test_v2_config_rejects_an_enabled_source_without_locked_paths(
