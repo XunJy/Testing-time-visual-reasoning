@@ -222,6 +222,29 @@ class VideoProbe:
 
 
 @dataclass(frozen=True, slots=True)
+class FFmpegFrameSyncPolicy:
+    """One explicitly advertised ffmpeg passthrough-sync spelling."""
+
+    cli_option: str
+    cli_value: str
+    selection_basis: str = "ffmpeg_hide_banner_help_full"
+    semantics: str = "passthrough_one_output_frame_per_selected_input_frame"
+
+    def __post_init__(self) -> None:
+        if (self.cli_option, self.cli_value) not in {
+            ("-fps_mode", "passthrough"),
+            ("-vsync", "0"),
+        }:
+            raise ValueError("Unsupported ffmpeg passthrough frame-sync policy")
+
+    def command_arguments(self) -> tuple[str, str]:
+        return self.cli_option, self.cli_value
+
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
 class VisualWetlandBirdsPreparation:
     video_archive_md5: str
     metadata_md5: dict[str, str]
@@ -847,6 +870,47 @@ def _read_exact(stream: Any, size: int) -> bytes:
     return b"".join(chunks)
 
 
+def _select_ffmpeg_frame_sync_policy(help_text: str) -> FFmpegFrameSyncPolicy:
+    """Select a passthrough spelling only from options ffmpeg advertises."""
+
+    has_fps_mode = (
+        re.search(r"(?m)^\s*-fps_mode(?:\[[^\]\r\n]*\])?(?:\s+|$)", help_text) is not None
+    )
+    has_vsync = re.search(r"(?m)^\s*-vsync(?:\s+|$)", help_text) is not None
+    if has_fps_mode:
+        return FFmpegFrameSyncPolicy(cli_option="-fps_mode", cli_value="passthrough")
+    if has_vsync:
+        # FFmpeg 4.4 exposes the older global spelling.  Numeric value 0 is
+        # the documented alias for passthrough and is equivalent here because
+        # this command has one selected video stream and one output.
+        return FFmpegFrameSyncPolicy(cli_option="-vsync", cli_value="0")
+    raise RuntimeError(
+        "ffmpeg advertises neither -fps_mode nor -vsync; "
+        "cannot guarantee one output frame per selected input frame"
+    )
+
+
+def resolve_ffmpeg_frame_sync_policy(
+    ffmpeg_binary: str = "ffmpeg",
+) -> FFmpegFrameSyncPolicy:
+    """Resolve the supported passthrough spelling without decode-time fallback."""
+
+    command = [ffmpeg_binary, "-hide_banner", "-h", "full"]
+    try:
+        completed = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RuntimeError(
+            f"Could not query {ffmpeg_binary} frame-sync capabilities: {error}"
+        ) from error
+    return _select_ffmpeg_frame_sync_policy(f"{completed.stdout}\n{completed.stderr}")
+
+
 def iter_sampled_video_frames(
     path: Path | str,
     probe: VideoProbe,
@@ -854,11 +918,14 @@ def iter_sampled_video_frames(
     stride: int = VISUAL_WETLANDBIRDS_FRAME_STRIDE,
     offset: int = VISUAL_WETLANDBIRDS_FRAME_OFFSET,
     ffmpeg_binary: str = "ffmpeg",
+    frame_sync_policy: FFmpegFrameSyncPolicy | None = None,
 ) -> Iterator[tuple[int, Image.Image]]:
     """Yield RGB frames selected by original decoded frame index."""
 
     if stride <= 0 or not 0 <= offset < stride:
         raise ValueError("stride must be positive and offset must be within one stride")
+    if frame_sync_policy is None:
+        frame_sync_policy = resolve_ffmpeg_frame_sync_policy(ffmpeg_binary)
     selected = tuple(range(offset, probe.frame_count, stride))
     expression = f"select=not(mod(n-{offset}\\,{stride}))"
     command = [
@@ -876,8 +943,7 @@ def iter_sampled_video_frames(
         "-dn",
         "-vf",
         expression,
-        "-fps_mode",
-        "passthrough",
+        *frame_sync_policy.command_arguments(),
         "-pix_fmt",
         "rgb24",
         "-f",
@@ -1060,6 +1126,7 @@ def _prepare_visual_wetlandbirds_locked(
     sampled_frame_rows = annotation_audit.sampled_annotated_frame_rows
 
     ffmpeg_version = _binary_version(ffmpeg_binary)
+    frame_sync_policy = resolve_ffmpeg_frame_sync_policy(ffmpeg_binary)
     ffprobe_version = _binary_version(ffprobe_binary)
     stage = Path(tempfile.mkdtemp(prefix=".visual-wetlandbirds-prepare-", dir=root_path))
     stage_crops = stage / "crops"
@@ -1100,6 +1167,7 @@ def _prepare_visual_wetlandbirds_locked(
                     video_path,
                     probe,
                     ffmpeg_binary=ffmpeg_binary,
+                    frame_sync_policy=frame_sync_policy,
                 ):
                     sampled_decoded_for_video += 1
                     for annotation in by_video_frame[video_name].get(frame_index, ()):
@@ -1271,6 +1339,7 @@ def _prepare_visual_wetlandbirds_locked(
             "decoder": {
                 "ffmpeg": ffmpeg_version,
                 "ffprobe": ffprobe_version,
+                "frame_sync": frame_sync_policy.to_dict(),
                 "pixel_format": "rgb24",
                 "pillow": PILLOW_VERSION,
             },

@@ -19,6 +19,7 @@ from ttvr.data.visual_wetlandbirds import (
     VISUAL_WETLANDBIRDS_FRAME_OFFSET,
     VISUAL_WETLANDBIRDS_FRAME_STRIDE,
     VISUAL_WETLANDBIRDS_TAXON_ALIGNMENTS,
+    FFmpegFrameSyncPolicy,
     StrictCUBSourceAudit,
     VideoProbe,
     audit_annotation_counts,
@@ -31,6 +32,7 @@ from ttvr.data.visual_wetlandbirds import (
     read_bounding_box_annotations,
     read_official_splits,
     read_species_ids,
+    resolve_ffmpeg_frame_sync_policy,
     validate_video_archive,
     visual_wetlandbirds_group_id,
 )
@@ -377,6 +379,113 @@ def test_group_id_preserves_original_video_and_track_identity() -> None:
     assert first != visual_wetlandbirds_group_id("002-test_bird", 7)
     with pytest.raises(ValueError):
         visual_wetlandbirds_group_id("../video", 0)
+
+
+def test_ffmpeg_frame_sync_capability_prefers_modern_stream_option() -> None:
+    help_text = (
+        "-vsync <> set video sync method globally; deprecated, use -fps_mode\n"
+        "-fps_mode[:<stream_spec>] set framerate mode for matching video streams\n"
+    )
+
+    policy = wetlandbirds._select_ffmpeg_frame_sync_policy(help_text)
+
+    assert policy == FFmpegFrameSyncPolicy(cli_option="-fps_mode", cli_value="passthrough")
+    assert policy.command_arguments() == ("-fps_mode", "passthrough")
+    assert policy.to_dict() == {
+        "cli_option": "-fps_mode",
+        "cli_value": "passthrough",
+        "selection_basis": "ffmpeg_hide_banner_help_full",
+        "semantics": "passthrough_one_output_frame_per_selected_input_frame",
+    }
+
+
+@pytest.mark.parametrize(
+    "option",
+    (
+        "-fps_mode[:<stream_spec>]",
+        "-fps_mode[:stream_specifier]",
+        "-fps_mode",
+    ),
+)
+def test_ffmpeg_frame_sync_capability_accepts_documented_stream_spec_spellings(
+    option: str,
+) -> None:
+    policy = wetlandbirds._select_ffmpeg_frame_sync_policy(
+        f"{option} set framerate mode for matching video streams\n"
+    )
+
+    assert policy.command_arguments() == ("-fps_mode", "passthrough")
+
+
+def test_ffmpeg_frame_sync_capability_uses_audited_ffmpeg_44_alias() -> None:
+    help_text = (
+        "ffmpeg version 4.4.2\n"
+        "-vsync              video sync method\n"
+        "The description may mention -fps_mode without advertising that option.\n"
+    )
+
+    policy = wetlandbirds._select_ffmpeg_frame_sync_policy(help_text)
+
+    assert policy.command_arguments() == ("-vsync", "0")
+    assert policy.semantics == "passthrough_one_output_frame_per_selected_input_frame"
+
+
+def test_ffmpeg_frame_sync_capability_fails_closed_without_passthrough_option() -> None:
+    with pytest.raises(RuntimeError, match="neither -fps_mode nor -vsync"):
+        wetlandbirds._select_ffmpeg_frame_sync_policy("-pix_fmt format")
+
+
+def test_ffmpeg_frame_sync_resolver_uses_explicit_capability_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        observed.append(command)
+        assert kwargs == {
+            "check": True,
+            "capture_output": True,
+            "text": True,
+            "timeout": 30,
+        }
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="-vsync parameter set video sync method globally\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(wetlandbirds.subprocess, "run", fake_run)
+
+    policy = resolve_ffmpeg_frame_sync_policy("ffmpeg-4.4")
+
+    assert observed == [["ffmpeg-4.4", "-hide_banner", "-h", "full"]]
+    assert policy.command_arguments() == ("-vsync", "0")
+
+
+def test_frame_extraction_does_not_retry_unrelated_decoder_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[list[str]] = []
+
+    def fail_to_launch(command: list[str], **_kwargs: object) -> None:
+        observed.append(command)
+        raise OSError("synthetic decoder failure")
+
+    monkeypatch.setattr(wetlandbirds.subprocess, "Popen", fail_to_launch)
+    frames = iter_sampled_video_frames(
+        "broken.mp4",
+        VideoProbe(width=32, height=24, frame_count=21, codec_name="mpeg4"),
+        ffmpeg_binary="ffmpeg-4.4",
+        frame_sync_policy=FFmpegFrameSyncPolicy(cli_option="-vsync", cli_value="0"),
+    )
+
+    with pytest.raises(RuntimeError, match="Could not launch ffmpeg"):
+        next(frames)
+
+    assert len(observed) == 1
+    assert "-vsync" in observed[0]
+    assert "-fps_mode" not in observed[0]
 
 
 def test_cpu_video_decoder_selects_frames_zero_ten_twenty(tmp_path: Path) -> None:
