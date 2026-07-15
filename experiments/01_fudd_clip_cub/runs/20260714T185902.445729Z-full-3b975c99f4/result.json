@@ -1,0 +1,107 @@
+{
+  "checks": {
+    "baseline_within_0.50pp_of_prior": true,
+    "fudd_within_0.50pp_of_prior": true,
+    "gain_within_0.50pp_of_paper": true,
+    "official_protocol_locked": true,
+    "official_reference_parity": true,
+    "official_test_size": true,
+    "positive_net_gain": true,
+    "prediction_count_matches": true
+  },
+  "completed_at_utc": "2026-07-14T19:12:52.032754+00:00",
+  "created_at_utc": "2026-07-14T18:59:02.445729+00:00",
+  "environment": {
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_matmul_allow_tf32": false,
+    "cuda_runtime": "12.8",
+    "cudnn": 91900,
+    "cudnn_allow_tf32": true,
+    "ftfy": "6.3.1",
+    "gpu": "Tesla T4",
+    "pillow": "11.3.0",
+    "platform": "Linux-6.6.122+-x86_64-with-glibc2.35",
+    "python": "3.12.13 (main, Mar  4 2026, 09:23:07) [GCC 11.4.0]",
+    "torch": "2.11.0+cu128",
+    "torchvision": "0.26.0+cu128"
+  },
+  "evaluation": {
+    "baseline": {
+      "top1": 63.3586468760787,
+      "top1_correct": 3671,
+      "top5": 92.12978943734898,
+      "top5_correct": 5338,
+      "total": 5794
+    },
+    "config": {
+      "batch_size": 32,
+      "cache_dir": "/home/codex/project/.cache/fudd_clip_cub",
+      "clip_precision": "fp32",
+      "data_root": "/home/codex/project/data",
+      "device": "cuda",
+      "model_name": "ViT-L/14@336px",
+      "num_workers": 2,
+      "prompt_root": "/home/codex/project/data/fudd_official",
+      "seed": 2026,
+      "text_batch_size": 256,
+      "top_k": 10
+    },
+    "dataset_fingerprint": "865ce63ecd9bf72d14ce683b141e3e9647d78bf4ac6a2d24f5bb7aaf1180c3bf",
+    "feature_dtype": "torch.float32",
+    "fudd": {
+      "candidate_hits": 5586,
+      "candidate_recall": 96.41007939247497,
+      "top1": 65.74042112530203,
+      "top1_correct": 3809,
+      "top5": 92.76838108387987,
+      "top5_correct": 5375,
+      "total": 5794
+    },
+    "num_samples": 5794,
+    "parity": {
+      "matching_predictions": 32,
+      "max_abs_prototype_difference": 1.1920928955078125e-07,
+      "passed": true,
+      "samples": 32
+    },
+    "prediction_count": 5794,
+    "prompt_digest": "f01f0c52b328e14b2eb535c888269247bf72f7e0c0c80c286a1d4d50e3870b0c",
+    "transfers": {
+      "both_correct": 3405,
+      "both_correct_percent": 58.76769071453227,
+      "both_wrong": 1719,
+      "both_wrong_percent": 29.668622713151535,
+      "degraded": 266,
+      "degraded_percent": 4.590956161546427,
+      "recovered": 404,
+      "recovered_percent": 6.972730410769762,
+      "total": 5794
+    }
+  },
+  "gain_pp": 2.3817742492233336,
+  "paper_target_percent": {
+    "baseline_top1": 63.48,
+    "fudd_top1": 65.9,
+    "gain_pp": 2.42
+  },
+  "predictions": {
+    "path": "predictions.jsonl",
+    "rows": 5794,
+    "sha256": "5ff4b21fd7827cf1aee21642947c662e6567caca79e090d9767ba33e77ce512e"
+  },
+  "prior_reproduction_percent": {
+    "baseline_top1": 63.36,
+    "fudd_top1": 65.74,
+    "gain_pp": 2.38
+  },
+  "run_id": "20260714T185902.445729Z-full-3b975c99f4",
+  "run_kind": "full",
+  "schema_version": 1,
+  "source": {
+    "official_fudd_commit": "32264231fec047eb0bbbf59bfdbc8e6d208a096b",
+    "openai_clip_commit": "a1d071733d7111c9c014f024669f959182114e33",
+    "project_source_sha256": "3b975c99f4c0af9d66d0beaf0d23f58d501437871c49b211c959203e31a62e04"
+  },
+  "status": "FULL_PASS"
+}

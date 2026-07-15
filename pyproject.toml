@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "testing-time-visual-reasoning"
+version = "0.1.0"
+description = "Reproducible method-plus-model experiments for testing-time visual reasoning"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "clip @ git+https://github.com/openai/CLIP.git@a1d071733d7111c9c014f024669f959182114e33",
+    "pillow>=9.4",
+    "torch>=2.2",
+    "torchvision>=0.17",
+]
+
+[project.optional-dependencies]
+dev = [
+    "nbformat>=5.10",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+]
+notebook = [
+    "jupyterlab>=4.2",
+    "nbformat>=5.10",
+    "numpy>=1.24,<3",
+]
+
+[project.urls]
+Repository = "https://github.com/XunJy/Testing-time-visual-reasoning"
+"FuDD paper" = "https://proceedings.iclr.cc/paper_files/paper/2024/hash/17eca81974d2fd34f458916e0bfd820d-Abstract-Conference.html"
+"Official FuDD code" = "https://github.com/BatsResearch/fudd"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["ttvr"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

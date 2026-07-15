@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.cache/
+.codex/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+*.egg-info/
+outputs/
+*.pt
+*.pth
+.DS_Store
+scratch/
+remote_returns/
+Old Patch/
+data/CUB_200_2011/
+data/CUB_200_2011.tgz
+data/CUB_200_2011.tgz.part
+# The FuDD repository does not declare a license for these upstream assets.
+# They are downloaded from the pinned author commit and SHA-256 verified.
+data/fudd_official/cub_class_names.json
+data/fudd_official/cub_prompt_pairs.json
+experiments/**/results/new*/
+experiments/**/generated/new*/
