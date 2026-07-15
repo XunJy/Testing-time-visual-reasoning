@@ -109,6 +109,7 @@ _EXPECTED_SPECIFIC_SPLIT_COUNTS = {
 }
 _EXPECTED_USED_CATEGORY_COUNTS = {1: 9_418, 2: 253, 3: 580, 4: 449, 5: 151, 6: 66}
 _EXPECTED_PATH_LABEL_MISMATCHES = {(3, 8): 4, (5, 10): 1}
+_KNOWN_OFFICIAL_NON_IMAGE_MEMBERS = frozenset({"images/eval/2/Thumbs.db"})
 _FILE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.png$")
 _OBJECT_SUFFIX_RE = re.compile(r"^(?P<frame>.+)_(?P<object>[0-9]+)$")
 
@@ -164,6 +165,7 @@ class UsgsAerialPreparation:
     source_group_count: int
     split_counts: dict[str, int]
     manifest_fingerprint: str
+    known_non_image_members: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -176,6 +178,7 @@ class UsgsAerialArchiveAudit:
     annotation_rows: int
     image_members: int
     specific_members: int
+    known_non_image_members: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -454,16 +457,27 @@ def audit_usgs_aerial_archives(
             "USGS images archive differs from the official release: "
             f"size={images.stat().st_size}, md5={images_md5}"
         )
-    members = validated_zip_members(
-        images,
-        expected_files=(row.relative_path for row in plan.all_rows),
+    members = validated_zip_members(images)
+    files = {name for name, info in members.items() if not info.is_dir()}
+    expected_images = {row.relative_path for row in plan.all_rows}
+    missing = sorted(expected_images - files)
+    unexpected = sorted(files - expected_images - _KNOWN_OFFICIAL_NON_IMAGE_MEMBERS)
+    if missing or unexpected:
+        raise RuntimeError(
+            "ZIP file-set mismatch: "
+            f"missing={missing[:5]} ({len(missing)}), "
+            f"extra={unexpected[:5]} ({len(unexpected)})"
+        )
+    known_non_image_members = tuple(
+        sorted((files - expected_images) & _KNOWN_OFFICIAL_NON_IMAGE_MEMBERS)
     )
     return UsgsAerialArchiveAudit(
         annotations_md5=plan.annotations_md5,
         images_md5=images_md5,
         annotation_rows=len(plan.all_rows),
-        image_members=sum(not info.is_dir() for info in members.values()),
+        image_members=len(expected_images),
         specific_members=len(plan.specific_rows),
+        known_non_image_members=known_non_image_members,
     )
 
 
@@ -621,6 +635,7 @@ def prepare_usgs_aerial_avian(
         "dataset_id": USGS_AERIAL_AVIAN_DATASET_ID,
         "doi": USGS_AERIAL_AVIAN_DOI,
         "images_archive": {
+            "known_non_image_members": archive_audit.known_non_image_members,
             "md5": archive_audit.images_md5,
             "official_url": USGS_IMAGES_URL,
             "size_bytes": images.stat().st_size,
@@ -659,4 +674,5 @@ def prepare_usgs_aerial_avian(
         source_group_count=len({row.source_frame_id for row in plan.specific_rows}),
         split_counts=validation.split_counts,
         manifest_fingerprint=validation.fingerprint,
+        known_non_image_members=archive_audit.known_non_image_members,
     )

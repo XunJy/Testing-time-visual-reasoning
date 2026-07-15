@@ -65,6 +65,7 @@ def _write_archives(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
     with zipfile.ZipFile(images, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for index, name in enumerate(image_paths):
             bundle.writestr(name, _png_bytes((20 * index, 80, 180)))
+        bundle.writestr("images/eval/2/Thumbs.db", b"official non-image metadata")
     return annotations, images, _birdnet_csv(tmp_path / "birdnet.csv"), image_paths
 
 
@@ -97,6 +98,7 @@ def test_plan_and_prepare_publisher_crops_without_recropping(tmp_path: Path) -> 
 
     assert report.publisher_crop_count == report.extracted_crops == 4
     assert report.omitted_coarse_crops == 2
+    assert report.known_non_image_members == ("images/eval/2/Thumbs.db",)
     samples = load_samples(root / "manifests/samples.jsonl")
     taxa = load_taxa(root / "manifests/taxa.jsonl")
     validation = validate_manifest(
@@ -116,6 +118,8 @@ def test_plan_and_prepare_publisher_crops_without_recropping(tmp_path: Path) -> 
     assert all(row["local_crop_applied"] is False for row in provenance)
     assert all(row["bbox_official"] is None for row in provenance)
     assert all("no source bbox released" in row["crop_provenance"] for row in provenance)
+    source = json.loads((root / "manifests/source.json").read_text())
+    assert source["images_archive"]["known_non_image_members"] == ["images/eval/2/Thumbs.db"]
     with pytest.raises(FileExistsError, match="Refusing to replace"):
         prepare_usgs_aerial_avian(
             root,
@@ -155,6 +159,15 @@ def test_archive_pairing_and_unsafe_annotation_paths_fail_closed(tmp_path: Path)
             bundle.writestr(name, _png_bytes((0, 0, 0)))
     with pytest.raises(RuntimeError, match="file-set mismatch"):
         audit_usgs_aerial_archives(plan, wrong, require_official_lock=False)
+
+    unexpected = tmp_path / "unexpected-images.zip"
+    with zipfile.ZipFile(unexpected, "w") as bundle:
+        for name in image_paths:
+            bundle.writestr(name, _png_bytes((0, 0, 0)))
+        bundle.writestr("images/eval/2/Thumbs.db", b"official non-image metadata")
+        bundle.writestr("images/eval/2/desktop.ini", b"not allow-listed")
+    with pytest.raises(RuntimeError, match=r"extra=.*desktop\.ini"):
+        audit_usgs_aerial_archives(plan, unexpected, require_official_lock=False)
 
     malicious = tmp_path / "malicious-annotations.zip"
     labelmap = "\n".join(
