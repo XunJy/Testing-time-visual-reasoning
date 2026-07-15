@@ -1,13 +1,12 @@
-# 图像推理项目交接说明
+# 图像推理项目交接说明（历史归档）
 
-> **2026-07-14 新实验线更新：** 本文主体保留迁移前项目的历史背景与 SigLIP 2
-> 结论，不作为当前目录结构说明。当前 canonical workspace 为
-> `/Users/xunj/Desktop/Testing-Time Visual Reasoning`。根目录的新实现已经通过直接 CLI
-> 完整复现 FuDD × OpenAI CLIP：CUB 官方测试集 5,794 张，单模板
-> `63.3586%`，FuDD k=10 `65.7404%`，提升 `+2.3818 pp`。新代码、运行方法和
-> 验收说明见 [`README.md`](README.md)，机器可读结果见
-> [`experiments/01_fudd_clip_cub/`](experiments/01_fudd_clip_cub/)。以下旧结果和路径
-> 继续作为历史记录保留，未被本次运行覆盖。
+> **归档说明：** 本文保留迁移前项目的背景、旧路径与早期 SigLIP 2 实验记录，
+> 不代表当前仓库状态，也不参与当前代码导入。当前项目入口见
+> [`README.md`](../../README.md)，正式实验注册表见
+> [`experiments/README.md`](../../experiments/README.md)，FuDD × OpenAI CLIP 的
+> 独立复现见
+> [`experiments/01_fudd_clip_cub/`](../../experiments/01_fudd_clip_cub/)。正文中的
+> `/Users/xunj/Desktop/Reasoning/` 均为历史路径，未被当前实验覆盖或改写。
 
 ## 1. 项目背景
 

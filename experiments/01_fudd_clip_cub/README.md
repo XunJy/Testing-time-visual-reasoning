@@ -1,7 +1,7 @@
 # Experiment 01: FuDD + OpenAI CLIP on CUB-200-2011
 
-This directory owns the new independent CUB reproduction.  It does not import
-or mutate anything under `Old Patch/`.
+This directory owns the independent CUB reproduction. It does not import or
+mutate the ignored local legacy archive.
 
 ## Locked scientific protocol
 
@@ -71,5 +71,5 @@ Canonical artifacts:
 The run used a Tesla T4, Python 3.12.13, PyTorch 2.11.0+cu128, and source digest
 `3b975c99f4c0af9d66d0beaf0d23f58d501437871c49b211c959203e31a62e04`.
 Every predeclared full-run check is true.  The exact agreement with the earlier
-historical numbers is a cross-check only; this run was produced through the new
-implementation and did not import `Old Patch/`.
+historical numbers is a cross-check only; this run was produced through the
+current implementation and did not import the ignored local legacy archive.

@@ -1,5 +1,11 @@
 # 06 · Feature adapter + OpenAI CLIP + Multi-Bird
 
+Status: **frozen unfinished BirdMix-v1 protocol; no formal run was completed**.
+
+This preregistration is retained as a historical protocol and is not being
+silently completed by later work. Experiment 07 is an independent expanded
+BirdMix-v2 study with its own locked sources, configuration, runs, and result.
+
 ## Question
 
 Can a small **class-agnostic** map learned from many bird species improve
@@ -132,5 +138,8 @@ never replaced.
 
 ## Current status
 
-In progress. Dataset preparation and CLIP feature extraction run per source so
-an interrupted Colab can resume without recomputing completed caches.
+Frozen unfinished. Dataset preparation and feature extraction were designed to
+resume per source, but the six-run BirdMix-v1 matrix was never formally run and
+this experiment has no result. See experiment 07 for the separately registered
+six-source BirdMix-v2 follow-up; its negative result does not replace or count
+as a result for this protocol.

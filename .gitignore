@@ -14,6 +14,8 @@ dist/
 outputs/
 *.pt
 *.pth
+# Experiment 05's small frozen classifier head is a canonical result artifact.
+!experiments/05_residual_head_clip_cub/runs/20260715T053257.143885Z-full-dd09ff67b6/heads.pt
 .DS_Store
 scratch/
 remote_returns/
