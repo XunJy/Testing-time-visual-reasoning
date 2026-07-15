@@ -21,9 +21,11 @@ from ttvr.data.visual_wetlandbirds import (
     VISUAL_WETLANDBIRDS_TAXON_ALIGNMENTS,
     FFmpegFrameSyncPolicy,
     StrictCUBSourceAudit,
+    VideoAnnotationCoverage,
     VideoProbe,
     audit_annotation_counts,
     audit_strict_cub_exclusions,
+    audit_video_annotation_coverage,
     build_visual_wetlandbirds_taxa,
     iter_sampled_video_frames,
     probe_video,
@@ -93,6 +95,47 @@ def test_annotation_parser_and_paper_stride_are_per_video_frame_index(
     # Changing CSV row order cannot change which original frames are retained.
     reversed_audit = audit_annotation_counts(tuple(reversed(annotations)))
     assert reversed_audit == audit
+
+
+def test_video_annotation_coverage_allows_and_counts_unannotated_tail() -> None:
+    coverage = audit_video_annotation_coverage(
+        VideoProbe(width=1920, height=1080, frame_count=470, codec_name="h264"),
+        (0, 1, 10, 407),
+    )
+
+    assert coverage == VideoAnnotationCoverage(
+        decoded_frame_count=470,
+        annotated_frame_row_count=4,
+        max_annotated_frame=407,
+        annotation_horizon_frame_count=408,
+        unannotated_trailing_frame_count=62,
+        sampled_decoded_frame_count=47,
+        sampled_unannotated_trailing_frame_count=6,
+        all_annotation_frames_in_range=True,
+    )
+    assert coverage.to_dict()["unannotated_trailing_frame_count"] == 62
+
+
+def test_video_annotation_coverage_fails_if_any_official_frame_is_out_of_range() -> None:
+    probe = VideoProbe(width=32, height=24, frame_count=21, codec_name="mpeg4")
+
+    with pytest.raises(RuntimeError, match="outside decoded video range"):
+        audit_video_annotation_coverage(probe, (0, 10, 21))
+
+    with pytest.raises(RuntimeError, match="Duplicate official annotation"):
+        audit_video_annotation_coverage(probe, (0, 10, 10))
+
+
+def test_video_annotation_coverage_exact_horizon_has_no_tail() -> None:
+    coverage = audit_video_annotation_coverage(
+        VideoProbe(width=32, height=24, frame_count=21, codec_name="mpeg4"),
+        (0, 10, 20),
+    )
+
+    assert coverage.annotation_horizon_frame_count == 21
+    assert coverage.unannotated_trailing_frame_count == 0
+    assert coverage.sampled_decoded_frame_count == 3
+    assert coverage.sampled_unannotated_trailing_frame_count == 0
 
 
 def test_annotation_parser_fails_closed_on_duplicate_tracks_and_code_literals(

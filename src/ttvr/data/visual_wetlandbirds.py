@@ -245,6 +245,23 @@ class FFmpegFrameSyncPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class VideoAnnotationCoverage:
+    """Range audit between one decoded video and its official bbox rows."""
+
+    decoded_frame_count: int
+    annotated_frame_row_count: int
+    max_annotated_frame: int
+    annotation_horizon_frame_count: int
+    unannotated_trailing_frame_count: int
+    sampled_decoded_frame_count: int
+    sampled_unannotated_trailing_frame_count: int
+    all_annotation_frames_in_range: bool = True
+
+    def to_dict(self) -> dict[str, int | bool]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
 class VisualWetlandBirdsPreparation:
     video_archive_md5: str
     metadata_md5: dict[str, str]
@@ -258,6 +275,9 @@ class VisualWetlandBirdsPreparation:
     sampled_crop_count: int
     decoded_frame_count: int
     decoded_sampled_frame_count: int
+    videos_with_unannotated_trailing_frames: int
+    unannotated_trailing_frame_count: int
+    sampled_unannotated_trailing_frame_count: int
     split_video_counts: dict[str, int]
     split_annotated_frame_counts: dict[str, int]
     split_dense_bbox_counts: dict[str, int]
@@ -858,6 +878,57 @@ def probe_video(path: Path | str, *, ffprobe_binary: str = "ffprobe") -> VideoPr
     return VideoProbe(width=width, height=height, frame_count=frame_count, codec_name=codec)
 
 
+def audit_video_annotation_coverage(
+    probe: VideoProbe,
+    annotation_frame_indices: Iterable[int],
+    *,
+    stride: int = VISUAL_WETLANDBIRDS_FRAME_STRIDE,
+    offset: int = VISUAL_WETLANDBIRDS_FRAME_OFFSET,
+) -> VideoAnnotationCoverage:
+    """Require every official bbox row to address a decoded video frame.
+
+    Publisher videos may continue after the last bbox row.  Those trailing
+    frames are valid video content, not evidence that an annotation is
+    misaligned.  They remain part of decoder accounting but can never create
+    a crop because sample creation additionally requires an official bbox.
+    """
+
+    if probe.frame_count <= 0:
+        raise ValueError("decoded frame count must be positive")
+    if stride <= 0 or not 0 <= offset < stride:
+        raise ValueError("stride must be positive and offset must be within one stride")
+    frames = tuple(annotation_frame_indices)
+    if not frames:
+        raise RuntimeError("Video has no official annotation frame rows")
+    if any(not isinstance(frame, int) or isinstance(frame, bool) or frame < 0 for frame in frames):
+        raise RuntimeError("Official annotation frame indices must be non-negative integers")
+    if len(set(frames)) != len(frames):
+        raise RuntimeError("Duplicate official annotation frame index in one video")
+    out_of_range = sorted(frame for frame in frames if frame >= probe.frame_count)
+    if out_of_range:
+        raise RuntimeError(
+            "Official annotation frame index is outside decoded video range: "
+            f"first_out_of_range={out_of_range[0]}, decoded_frame_count={probe.frame_count}"
+        )
+
+    max_annotated_frame = max(frames)
+    sampled_frames = range(offset, probe.frame_count, stride)
+    sampled_decoded_frame_count = len(sampled_frames)
+    sampled_unannotated_trailing_frame_count = sum(
+        frame > max_annotated_frame for frame in sampled_frames
+    )
+    annotation_horizon_frame_count = max_annotated_frame + 1
+    return VideoAnnotationCoverage(
+        decoded_frame_count=probe.frame_count,
+        annotated_frame_row_count=len(frames),
+        max_annotated_frame=max_annotated_frame,
+        annotation_horizon_frame_count=annotation_horizon_frame_count,
+        unannotated_trailing_frame_count=(probe.frame_count - annotation_horizon_frame_count),
+        sampled_decoded_frame_count=sampled_decoded_frame_count,
+        sampled_unannotated_trailing_frame_count=(sampled_unannotated_trailing_frame_count),
+    )
+
+
 def _read_exact(stream: Any, size: int) -> bytes:
     chunks: list[bytes] = []
     remaining = size
@@ -1104,12 +1175,10 @@ def _prepare_visual_wetlandbirds_locked(
     )
     dense_by_video: Counter[str] = Counter()
     frame_rows_by_video: Counter[str] = Counter()
-    max_frame_by_video: dict[str, int] = {}
+    frame_indices_by_video: dict[str, set[int]] = defaultdict(set)
     for annotation in annotations:
         dense_by_video[annotation.video_name] += 1
-        max_frame_by_video[annotation.video_name] = max(
-            max_frame_by_video.get(annotation.video_name, -1), annotation.frame_index
-        )
+        frame_indices_by_video[annotation.video_name].add(annotation.frame_index)
         if (
             annotation.frame_index % VISUAL_WETLANDBIRDS_FRAME_STRIDE
             == VISUAL_WETLANDBIRDS_FRAME_OFFSET
@@ -1137,6 +1206,9 @@ def _prepare_visual_wetlandbirds_locked(
     video_rows: list[dict[str, Any]] = []
     decoded_frame_count = 0
     decoded_sampled_frame_count = 0
+    videos_with_unannotated_trailing_frames = 0
+    unannotated_trailing_frame_count = 0
+    sampled_unannotated_trailing_frame_count = 0
     try:
         member_by_video = {member.video_name: member for member in archive_members}
         with zipfile.ZipFile(archive_path) as archive:
@@ -1153,12 +1225,17 @@ def _prepare_visual_wetlandbirds_locked(
                 video_path = scratch / f"{video_name}.mp4"
                 extracted_sha256 = _extract_member(archive, member, video_path)
                 probe = probe_video(video_path, ffprobe_binary=ffprobe_binary)
-                max_annotated_frame = max_frame_by_video[video_name]
-                if probe.frame_count != max_annotated_frame + 1:
-                    raise RuntimeError(
-                        f"Video/annotation frame-count mismatch for {video_name}: "
-                        f"video={probe.frame_count}, max_annotation={max_annotated_frame}"
-                    )
+                coverage = audit_video_annotation_coverage(
+                    probe,
+                    sorted(frame_indices_by_video[video_name]),
+                )
+                videos_with_unannotated_trailing_frames += int(
+                    coverage.unannotated_trailing_frame_count > 0
+                )
+                unannotated_trailing_frame_count += coverage.unannotated_trailing_frame_count
+                sampled_unannotated_trailing_frame_count += (
+                    coverage.sampled_unannotated_trailing_frame_count
+                )
                 decoded_frame_count += probe.frame_count
                 sampled_decoded_for_video = 0
                 sampled_crops_for_video = 0
@@ -1231,6 +1308,12 @@ def _prepare_visual_wetlandbirds_locked(
                             }
                         )
                         sampled_crops_for_video += 1
+                if sampled_decoded_for_video != coverage.sampled_decoded_frame_count:
+                    raise RuntimeError(
+                        f"Sampled decoder count mismatch for {video_name}: "
+                        f"decoded={sampled_decoded_for_video}, "
+                        f"expected={coverage.sampled_decoded_frame_count}"
+                    )
                 decoded_sampled_frame_count += sampled_decoded_for_video
                 video_rows.append(
                     {
@@ -1249,8 +1332,9 @@ def _prepare_visual_wetlandbirds_locked(
                         "width": probe.width,
                         "height": probe.height,
                         "frame_count": probe.frame_count,
-                        "max_annotated_frame": max_annotated_frame,
+                        "max_annotated_frame": coverage.max_annotated_frame,
                         "annotated_frame_rows": frame_rows_by_video[video_name],
+                        "annotation_coverage": coverage.to_dict(),
                         "dense_bbox_count": dense_by_video[video_name],
                         "sampled_decoded_frame_count": sampled_decoded_for_video,
                         "sampled_crop_count": sampled_crops_for_video,
@@ -1293,6 +1377,9 @@ def _prepare_visual_wetlandbirds_locked(
             sampled_crop_count=len(samples),
             decoded_frame_count=decoded_frame_count,
             decoded_sampled_frame_count=decoded_sampled_frame_count,
+            videos_with_unannotated_trailing_frames=(videos_with_unannotated_trailing_frames),
+            unannotated_trailing_frame_count=unannotated_trailing_frame_count,
+            sampled_unannotated_trailing_frame_count=(sampled_unannotated_trailing_frame_count),
             split_video_counts=dict(sorted(split_video_counts.items())),
             split_annotated_frame_counts=dict(sorted(split_annotated_frame_counts.items())),
             split_dense_bbox_counts=dict(sorted(split_dense_bbox_counts.items())),
@@ -1347,6 +1434,24 @@ def _prepare_visual_wetlandbirds_locked(
                 "defined_behavior_ids": sorted(behavior_by_id),
                 "unmapped_behavior_ids_preserved": list(VISUAL_WETLANDBIRDS_UNMAPPED_BEHAVIOR_IDS),
                 "behavior_id_counts": report.behavior_id_counts,
+                "frame_range_policy": {
+                    "required": (
+                        "every official bbox frame index is non-negative and strictly "
+                        "less than the ffprobe decoded frame count"
+                    ),
+                    "unannotated_trailing_frames": (
+                        "allowed and retained in decoder accounting; a stride-selected "
+                        "frame creates no sample unless bounding_boxes.csv contains an "
+                        "official bbox for that exact frame"
+                    ),
+                    "videos_with_unannotated_trailing_frames": (
+                        report.videos_with_unannotated_trailing_frames
+                    ),
+                    "unannotated_trailing_frame_count": (report.unannotated_trailing_frame_count),
+                    "sampled_unannotated_trailing_frame_count": (
+                        report.sampled_unannotated_trailing_frame_count
+                    ),
+                },
                 "note": (
                     "v4 bounding_boxes.csv uses id 7 although behaviors_ID.csv "
                     "defines only 0--6; species labels/crops do not depend on behavior."
