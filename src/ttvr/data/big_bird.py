@@ -64,8 +64,7 @@ BIG_BIRD_DATASET_ID = "big-bird-v2026.03.21-bbox-crops"
 BIG_BIRD_SOURCE_VERSION = "2026.03.21"
 BIG_BIRD_SOURCE_URL = "https://lila.science/datasets/big-bird/"
 BIG_BIRD_METADATA_URL = (
-    "https://lilawildlife.blob.core.windows.net/lila-wildlife/"
-    "big-bird/wilson-bigbird.json"
+    "https://lilawildlife.blob.core.windows.net/lila-wildlife/big-bird/wilson-bigbird.json"
 )
 BIG_BIRD_METADATA_FILENAME = "wilson-bigbird.json"
 BIG_BIRD_METADATA_OBSERVED_SHA256 = (
@@ -79,8 +78,7 @@ BIG_BIRD_LICENSE_URL = (
     "data-deposit-checklist/license-reuse-with-acknowledgement"
 )
 BIG_BIRD_LICENSE = (
-    "University of Queensland Permitted Re-Use with Acknowledgement "
-    f"({BIG_BIRD_LICENSE_URL})"
+    f"University of Queensland Permitted Re-Use with Acknowledgement ({BIG_BIRD_LICENSE_URL})"
 )
 BIG_BIRD_CITATION = (
     "Wilson et al. (2026), Big Bird: A global dataset of birds in drone imagery "
@@ -408,16 +406,13 @@ def _resolve_big_bird_taxon(
             )
         row = rows_by_id.get(override.birdnet_id)
         if row is None:
-            raise RuntimeError(
-                f"Reviewed Big Bird BirdNET id is missing: {override.birdnet_id}"
-            )
+            raise RuntimeError(f"Reviewed Big Bird BirdNET id is missing: {override.birdnet_id}")
         if (
             row.scientific_name != override.accepted_scientific_name
             or row.common_name != override.accepted_common_name
         ):
             raise RuntimeError(
-                "Reviewed Big Bird taxonomy override changed in BirdNET: "
-                f"{override.birdnet_id}"
+                f"Reviewed Big Bird taxonomy override changed in BirdNET: {override.birdnet_id}"
             )
         match = row
     else:
@@ -477,10 +472,7 @@ def plan_big_bird(
             "Big Bird metadata SHA-256 differs from the observed v2026.03.21 object: "
             f"{metadata_sha256}"
         )
-    if (
-        require_official_lock
-        and birdnet_csv_sha256 != BIG_BIRD_BIRDNET_CSV_OBSERVED_SHA256
-    ):
+    if require_official_lock and birdnet_csv_sha256 != BIG_BIRD_BIRDNET_CSV_OBSERVED_SHA256:
         raise RuntimeError(
             "BirdNET CSV SHA-256 differs from the observed v0.3-Jul2026 taxonomy: "
             f"{birdnet_csv_sha256}"
@@ -887,9 +879,7 @@ def _ensure_source_image(
         # A concurrent winner must represent the same publisher object.
         final_actual = md5_base64_file(destination)
         if final_actual != record.md5_base64:
-            raise RuntimeError(
-                f"Concurrent Big Bird source MD5 mismatch for {record.object_name}"
-            )
+            raise RuntimeError(f"Concurrent Big Bird source MD5 mismatch for {record.object_name}")
         if destination.stat().st_size != record.size:
             raise RuntimeError(f"Downloaded Big Bird source size mismatch: {record.object_name}")
     finally:
@@ -1161,9 +1151,7 @@ def prepare_big_bird(
         require_official_lock=require_official_lock,
     )
 
-    required_objects = {
-        f"{BIG_BIRD_GCS_PREFIX}{image.file_name}" for image in plan.images
-    }
+    required_objects = {f"{BIG_BIRD_GCS_PREFIX}{image.file_name}" for image in plan.images}
     object_records = _list_gcs_objects(required_objects)
     crops_by_image: dict[str, list[BigBirdCropPlan]] = defaultdict(list)
     for crop in plan.crops:
@@ -1283,9 +1271,7 @@ def prepare_big_bird(
                 "unique exact scientific-name or scientific-alias match; reviewed override only; "
                 "ambiguity and absence fail closed"
             ),
-            "overrides": [
-                override.to_dict() for override in BIG_BIRD_BIRDNET_TAXONOMY_OVERRIDES
-            ],
+            "overrides": [override.to_dict() for override in BIG_BIRD_BIRDNET_TAXONOMY_OVERRIDES],
         },
     }
     _write_manifest_bundle(
