@@ -1,0 +1,282 @@
+{
+  "aggregation_policy": {
+    "ci95": "two-sided Student t interval over the three preregistered seeds; df=2; t(0.975,2)=4.302652729911275; endpoints are not clipped",
+    "point_estimate": "arithmetic mean over preregistered seeds",
+    "seed_count": 3
+  },
+  "audit": {
+    "cub_crosswalk_artifacts_identical_across_seeds": true,
+    "cub_crosswalk_matches_locked_class_names_and_birdnet_csv": true,
+    "cub_identity_labels_and_baseline_top5_identical_across_seeds": true,
+    "cub_predictions_recomputed_from_exactly_5794_rows": true,
+    "recorded_input_digests_identical_across_seeds": true,
+    "recorded_inputs_rehashed_without_size_or_mtime_change": true,
+    "seed_invariant_run_configs": true,
+    "source_and_target_text_prototypes_identical_across_seeds": true,
+    "target_prototypes_match_locked_cub_class_names": true,
+    "verified_input_file_count": 28,
+    "verified_inputs": [
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/big-bird-v2026.03.21-bbox-crops-train-ViT-L-14-336px-99be7f15685fe24c-fp32-6fda416124287d1d.pt",
+        "sha256": "95551a0f14954e0d4b68ec5dabb5ddb835935108fc62cb5b588fc6fcec756cad"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/birdnet-taxonomy-v0.3-jul2026-train-ViT-L-14-336px-99be7f15685fe24c-fp32-e5eb24afb0659ab7.pt",
+        "sha256": "2cf2dd8adf3cfd02dd4ab155a18e0ea52c128c7dce91ccdfc4b4b57a272e9531"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/inaturalist-2021-mini-aves-train-ViT-L-14-336px-99be7f15685fe24c-fp32-9b75be36a1341334.pt",
+        "sha256": "4f2510c3acec8e97f477951e8aefbeb61f5d6ca8475e79f41caa2bf2263e081b"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/inaturalist-2021-mini-aves-validation-ViT-L-14-336px-99be7f15685fe24c-fp32-ea842874839095cc.pt",
+        "sha256": "9f97fba2600ab3da2099ff600566535eccacdb615b5d6392d7f4168f4337f57e"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/nm-uas-waterfowl-expert-consensus-v1-train-ViT-L-14-336px-99be7f15685fe24c-fp32-10635ef53cdf754f.pt",
+        "sha256": "d9fe26a89130fc0ea64204f4d020211826cba29510f91f17e422bd294a67b0cd"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/usgs-aerial-avian-2023-publisher-crops-train-ViT-L-14-336px-99be7f15685fe24c-fp32-ee8d6ae647f2780a.pt",
+        "sha256": "8a438ee1a5b79c845babe5c343b991f596d482f2b9eaeda1b5a625c2763195cd"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/usgs-aerial-avian-2023-publisher-crops-validation-ViT-L-14-336px-99be7f15685fe24c-fp32-d2116070de40b786.pt",
+        "sha256": "d0cfbfac90bc688fca0b7fc6ebc84f1bd6aa16843ad1727ca1daa73ada341e5b"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/visual-wetlandbirds-v4-stride10-crops-train-ViT-L-14-336px-99be7f15685fe24c-fp32-90e10cd1e0878e8e.pt",
+        "sha256": "a6025489ffbc36dab35fe02b000449ec54b6cbe35b2ada8dd88c827a61612b46"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/cache/clip_birdmix_v2/image_features/visual-wetlandbirds-v4-stride10-crops-validation-ViT-L-14-336px-99be7f15685fe24c-fp32-46f1dfe74c7e2621.pt",
+        "sha256": "587d02313f8cca0e69ba3420c2a2a6b66c00d3ca357810c05ac71acede4ff7f4"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/big-bird-v2026.03.21-bbox-crops/samples.jsonl",
+        "sha256": "4f14518c958ae99e43ea6584502afd5ced0078879d40a60fb1c6da0decc1caba"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/big-bird-v2026.03.21-bbox-crops/source.json",
+        "sha256": "f8a65ddf6c1abe96db043c104872660c42ce022d273047ae06c068a4c57376ab"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/big-bird-v2026.03.21-bbox-crops/taxa.jsonl",
+        "sha256": "3aaaad22aefb693547e1546018e9ad3dc3fd82ebfec3c7c955ef38adda0e5996"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/birdnet-taxonomy-v0.3-jul2026/samples.jsonl",
+        "sha256": "01b27affb2609c797edb385fe7da27d3fd4004382f928b14f021d574d80aafe1"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/birdnet-taxonomy-v0.3-jul2026/source.json",
+        "sha256": "1ee8f7b593cc31813bf368a89a90c2cb6a0ee40def6f64038531e48cc1b64d8f"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/birdnet-taxonomy-v0.3-jul2026/taxa.jsonl",
+        "sha256": "1b5f3c9ba8893a3d5b93753536bfff26fb6285d0f23b94fe7e2b57fc8b7015f2"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/inaturalist-2021-mini-aves/samples.jsonl",
+        "sha256": "24bfcb9b98fe98e995d406488be0e94c2e171363fc99b8afe83d6fe1325a2c19"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/inaturalist-2021-mini-aves/source.json",
+        "sha256": "6d980b40e027a1bef30ded3ba5776ba731129df0d7b7f92edebfdde84f4552ca"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/inaturalist-2021-mini-aves/taxa.jsonl",
+        "sha256": "c1248f06f5b2765e6e8b04619217d7a12dfdb1a0e55d4b114b0a20cfd4061ce2"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/nm-uas-waterfowl-expert-consensus-v1/samples.jsonl",
+        "sha256": "c5309d4ba671eae4a2ebda4b6f27bc90997e5da7d5b6541792ba04fdeee1070e"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/nm-uas-waterfowl-expert-consensus-v1/source.json",
+        "sha256": "2349622b37c1f7f97fa70e87301e301e1046a82af15ba34911f088925543c0a6"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/nm-uas-waterfowl-expert-consensus-v1/taxa.jsonl",
+        "sha256": "9426fa61119d18a50a5adf936b6c6138b0ccc0634a968292b21949237fb7d69d"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/usgs-aerial-avian-2023-publisher-crops/samples.jsonl",
+        "sha256": "6037907064a87bc6643b2cb79593085e3af8ae7040f12dae1718961857404f5a"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/usgs-aerial-avian-2023-publisher-crops/source.json",
+        "sha256": "a65a2c2eaeda53c0bbb96bb1e50d7ab5d687ab316507d1464df5c992b529550a"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/usgs-aerial-avian-2023-publisher-crops/taxa.jsonl",
+        "sha256": "2c1a8490af190ca13d6fdb9583256ea97b7db980257894fb921bb593854c6dbc"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/visual-wetlandbirds-v4-stride10-crops/samples.jsonl",
+        "sha256": "3b6f8136f841fff69e05196c2d4428e07df45eb8b28484a72f97c9e030d1399b"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/visual-wetlandbirds-v4-stride10-crops/source.json",
+        "sha256": "1f1ab3a1e6ac0543a9a239ceb5315087f3abef9be0580c41cbd6cba52797f7a9"
+      },
+      {
+        "path": "/content/drive/MyDrive/Testing-Time Visual Reasoning/manifests/visual-wetlandbirds-v4-stride10-crops/taxa.jsonl",
+        "sha256": "64c36354aa9303257ad1e8e84a371123e7369376e265c94f8145e1d4000b3329"
+      },
+      {
+        "path": "/home/codex/project/.cache/fudd_clip_cub/image_features/cub-test-ViT-L-14-336px-99be7f15685fe24c-fp32-torch.float32-865ce63ecd9bf72d-all.pt",
+        "sha256": "a34f8d94d83a09b6cdb71e7f3e5dd782c48173744eaaf24cebf607cf9c2cc889"
+      }
+    ]
+  },
+  "experiment_id": "07_feature_adapter_clip_birdmix_v2_cub",
+  "protocol": "external-only-strict-cub-birdmix-v2",
+  "run_count": 3,
+  "runs": [
+    {
+      "adapted": {
+        "top1": 62.58198136002761,
+        "top1_correct": 3626,
+        "total": 5794
+      },
+      "baseline": {
+        "top1": 63.3586468760787,
+        "top1_correct": 3671,
+        "total": 5794
+      },
+      "best_step": 250,
+      "degraded": 322,
+      "gain_top1_percentage_points": -0.7766655160510894,
+      "kind": "clip-birdmix-v2-all-enabled-sources-seed2026",
+      "recovered": 277,
+      "run_directory": "20260715T154949.367999Z-clip-birdmix-v2-all-enabled-sources-seed2026-a5cf45b15e",
+      "seed": 2026,
+      "strict_transfer_criterion_passed": false,
+      "trial_id": "all-enabled-sources"
+    },
+    {
+      "adapted": {
+        "top1": 61.96064894718675,
+        "top1_correct": 3590,
+        "total": 5794
+      },
+      "baseline": {
+        "top1": 63.3586468760787,
+        "top1_correct": 3671,
+        "total": 5794
+      },
+      "best_step": 750,
+      "degraded": 450,
+      "gain_top1_percentage_points": -1.3979979288919537,
+      "kind": "clip-birdmix-v2-all-enabled-sources-seed2027",
+      "recovered": 369,
+      "run_directory": "20260715T155207.640332Z-clip-birdmix-v2-all-enabled-sources-seed2027-ea1529c84d",
+      "seed": 2027,
+      "strict_transfer_criterion_passed": false,
+      "trial_id": "all-enabled-sources"
+    },
+    {
+      "adapted": {
+        "top1": 62.823610631687956,
+        "top1_correct": 3640,
+        "total": 5794
+      },
+      "baseline": {
+        "top1": 63.3586468760787,
+        "top1_correct": 3671,
+        "total": 5794
+      },
+      "best_step": 750,
+      "degraded": 381,
+      "gain_top1_percentage_points": -0.5350362443907457,
+      "kind": "clip-birdmix-v2-all-enabled-sources-seed2028",
+      "recovered": 350,
+      "run_directory": "20260715T155325.564186Z-clip-birdmix-v2-all-enabled-sources-seed2028-63742a2043",
+      "seed": 2028,
+      "strict_transfer_criterion_passed": false,
+      "trial_id": "all-enabled-sources"
+    }
+  ],
+  "runs_root": "/content/drive/MyDrive/Testing-Time Visual Reasoning/runs/07_feature_adapter_clip_birdmix_v2_cub",
+  "schema_version": 2,
+  "selection_policy": "exactly-one-complete-run-per-preregistered-trial-seed",
+  "study_config": "/home/codex/project/experiments/07_feature_adapter_clip_birdmix_v2_cub/configs/clip_birdmix_v2_study.json",
+  "study_config_sha256": "7fcc60e171ae9857c61e3499f5c8550ddd2540c57854f86b652a2ba9201058ed",
+  "study_id": "clip-birdmix-v2",
+  "target_based_run_selection": false,
+  "trials": [
+    {
+      "adapted_top1": {
+        "ci95_high": 63.561316091167924,
+        "ci95_low": 61.349511201433614,
+        "ci95_method": "two-sided Student t interval over the three preregistered seeds; df=2; t(0.975,2)=4.302652729911275; endpoints are not clipped",
+        "mean": 62.45541364630077,
+        "per_seed": [
+          {
+            "seed": 2026,
+            "value": 62.58198136002761
+          },
+          {
+            "seed": 2027,
+            "value": 61.96064894718675
+          },
+          {
+            "seed": 2028,
+            "value": 62.823610631687956
+          }
+        ],
+        "sample_standard_deviation": 0.4451856431285943,
+        "unit": "percentage_points"
+      },
+      "all_seeds_positive_gain": false,
+      "all_seeds_strict_transfer_criterion_passed": false,
+      "baseline_top1": {
+        "ci95_high": 63.3586468760787,
+        "ci95_low": 63.3586468760787,
+        "ci95_method": "two-sided Student t interval over the three preregistered seeds; df=2; t(0.975,2)=4.302652729911275; endpoints are not clipped",
+        "mean": 63.3586468760787,
+        "per_seed": [
+          {
+            "seed": 2026,
+            "value": 63.3586468760787
+          },
+          {
+            "seed": 2027,
+            "value": 63.3586468760787
+          },
+          {
+            "seed": 2028,
+            "value": 63.3586468760787
+          }
+        ],
+        "sample_standard_deviation": 0.0,
+        "unit": "percentage_points"
+      },
+      "gain_top1": {
+        "ci95_high": 0.2026692150892263,
+        "ci95_low": -2.0091356746450857,
+        "ci95_method": "two-sided Student t interval over the three preregistered seeds; df=2; t(0.975,2)=4.302652729911275; endpoints are not clipped",
+        "mean": -0.9032332297779296,
+        "per_seed": [
+          {
+            "seed": 2026,
+            "value": -0.7766655160510894
+          },
+          {
+            "seed": 2027,
+            "value": -1.3979979288919537
+          },
+          {
+            "seed": 2028,
+            "value": -0.5350362443907457
+          }
+        ],
+        "sample_standard_deviation": 0.4451856431285943,
+        "unit": "percentage_points"
+      },
+      "seed_count": 3,
+      "trial_id": "all-enabled-sources"
+    }
+  ]
+}
